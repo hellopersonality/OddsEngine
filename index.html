@@ -340,7 +340,7 @@ const headsP=()=>.55+.05*S.luck;
 const resFor=t=>t==='gold'||t==='wild'?'h':Math.random()<(t==='lead'?.75:headsP())?'h':'t';
 const need=()=>Math.round(2*Math.pow(1.6,S.lv-1));
 // level 1 is free play (no limit); from level 2 on every level gets a fixed press budget
-const BUDGET=5,calibrating=()=>!S.budget;
+const BUDGET=5,MAXPRESS=5,calibrating=()=>!S.budget;
 const budget=()=>Math.max(1,S.budget-(hasPart('overclock')?1:0));
 let bestLv=1;try{bestLv=+localStorage.getItem('oddsEngine.bestLv')||1}catch(e){}
 if(matchMedia('(prefers-reduced-motion: reduce)').matches)cfg.shake=false;
@@ -529,7 +529,9 @@ function landDie(d,v,mine,spill,seq=[v]){
   if(seq.length>1&&J)world.popText('= '+tot,d.hx,d.hy+d.size*1.05,{size:Math.max(24,d.size*.6),layers:2,kick:7,ci:3,life:1.1});
   if(hasPart('overclock')){partJ('overclock').punch(8);if(J)world.popText('×2',d.hx-d.size*.65,d.hy+d.size*.2,{size:Math.max(18,d.size*.4),ci:1,life:.8})}
   if(maxed&&d.p.six)bpulse(d,'sixes');if(d.p.min>1&&v<=d.p.min)bpulse(d,'loaded');
-  if(maxed&&d.p.reb&&!d.refunded){d.refunded=true;ph.refunds++;S.left++;freePips.add(S.left-1);freeStamp={i:S.left-1,t:tA};bpulse(d,'rebate');updateGoLabel();sfx.ping();barJ.punch(6);if(J)world.popText('FREE ROLL!',d.hx,d.hy+d.size*.9,{size:24,ci:5,layers:2,life:1})}
+  // free presses cap at MAXPRESS in total; a refund past that is ignored, with a pop-up saying so
+  if(maxed&&d.p.reb&&!d.refunded&&S.left>=MAXPRESS){bpulse(d,'rebate');if(J)world.popText('PRESSES FULL',d.hx,d.hy+d.size*.9,{size:18,ci:6,life:.9})}
+  else if(maxed&&d.p.reb&&!d.refunded){d.refunded=true;ph.refunds++;S.left++;freePips.add(S.left-1);freeStamp={i:S.left-1,t:tA};bpulse(d,'rebate');updateGoLabel();sfx.ping();barJ.punch(6);if(J)world.popText('FREE ROLL!',d.hx,d.hy+d.size*.9,{size:24,ci:5,layers:2,life:1})}
   if(J){world.popText(String(v),d.hx+d.size*.55,d.hy-d.size*.55,{size:Math.max(22,d.size*.55),rise:14,ci:i8()});
     if(v===d.sides&&d.p.six&&seq.length===1)world.popText('+'+d.p.six,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
   mine.forEach((c,k)=>at(T+.08+k*spill,()=>{spawnCoin(c);if(k%2===0)sfx.spill(k)}));
@@ -1116,7 +1118,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126051852';let updShown=false,updDismissed='';
+const BUILD='20261126075620';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
