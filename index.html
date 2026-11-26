@@ -1195,6 +1195,7 @@ DEV.ready=(async()=>{try{const h=navigator.userAgentData;if(!h||!h.getHighEntrop
   else if(DEV.os==='mac'){DEV.osv=a+(b?b/10:0);DEV.osMin=false}}catch(e){}})();
 const SHARE='<svg width="13" height="15" viewBox="0 0 14 16" aria-hidden="true"><path d="M7 1v9M3.5 4.5 7 1l3.5 3.5M2.5 7.5H1.5v7h11v-7h-1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
 const ki=x=>`<span class="ki">${x}</span>`;
+const PAGEMENU='<svg width="15" height="12" viewBox="0 0 15 12" aria-hidden="true"><path d="M1 1.5h13M1 6h13M1 10.5h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>';
 const MACN={11:'Big Sur',12:'Monterey',13:'Ventura',14:'Sonoma',15:'Sequoia',26:'Tahoe'};
 function osLabel(){const d=DEV,v=d.osv,f=x=>String(+x.toFixed(1)).replace(/\.0$/,'');
   if(d.ios){const n=d.kind==='ipad'?'iPadOS':'iOS';return v?`${n} ${f(v)}${d.osMin?' or later':''}`:n}
@@ -1211,8 +1212,11 @@ function installSteps(){const d=DEV,b=d.browser,v=d.osv,share=ki(SHARE+' Share')
   if(d.ios){
     const old=v&&!d.osMin&&v<16.4;
     if(b==='safari'){
+      // iOS 27 swapped the ··· button for a Tabs button; Share now lives in the page menu (≡) at the left of the address bar
+      if(v>=27)return{steps:[`Tap ${ki(PAGEMENU)} at the left end of the address bar`,`Tap ${share}`,`Scroll down and tap ${a2h}`,`Keep ${ki('Open as Web App')} on and tap ${add}`],
+        alt:[`Or press and hold the address bar, then tap ${share}`,`See ${share} right in the toolbar (Bottom or Top tab layout)? Tap it, then ${a2h} → ${add}`,`See a ${ki('···')} button instead? Tap it, then ${share}`]};
       if(v>=26)return{steps:[`Tap ${ki('···')} at the end of the address bar`,`Tap ${share}`,`Scroll down and tap ${a2h}`,`Keep ${ki('Open as Web App')} on and tap ${add}`],
-        alt:[`See ${share} right in the toolbar (Bottom or Top tab layout)? Tap it, then ${a2h} → ${add}`,`Toolbar hidden? Scroll up a little to bring it back`]};
+        alt:[`See ${share} right in the toolbar (Bottom or Top tab layout)? Tap it, then ${a2h} → ${add}`,`Toolbar hidden? Scroll up a little to bring it back`,`No ··· button? Tap ${ki(PAGEMENU)} at the left of the address bar, then ${share}`]};
       if(d.kind==='ipad')return{steps:[`Tap ${share} at the top right, next to the address bar`,`Scroll down and tap ${a2h}`,`Tap ${add}`],alt:[`No Share button? Tap the address bar once, then look again`]};
       return{steps:[`Tap ${share} in the bar at the bottom of the screen`,`Scroll down and tap ${a2h}`,`Tap ${add}`],
         alt:[`Bar hidden? Scroll up a little or tap the bottom edge to bring it back`,`Address bar at the top? Share is still in the bottom toolbar`]}}
@@ -1266,7 +1270,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126160714';let updShown=false,updDismissed='';
+const BUILD='20261126160949';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
