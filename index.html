@@ -302,17 +302,26 @@ const PARTS={
   echo:{name:'Echo chamber',r:1,col:'#c39bff',desc:'The first line every press pays double'},
   net:{name:'Safety net',r:0,col:'#3ddc97',desc:'Tails in the bottom row flip once more'}};
 const PSLOTS=3;
+// ---- effect dice: special dice whose marked faces trigger an effect once every coin has settled ----
+const FXD={
+  reflip:{name:'Re-flip die',sides:6,faces:[2,4,6],col:'#c9f7d8',acc:'#14804a',r:2,glyph:'↻',tag:'RE-FLIP',desc:'A d6. On an even roll, once everything settles, every tails flips again'},
+  spin:{name:'Spinner die',sides:8,faces:[7,8],col:'#fff2b8',acc:'#a86f00',r:2,glyph:'7',tag:'SPIN',desc:'A d8. On 7 or 8, once everything settles, the board spins like slot reels'},
+  wild:{name:'Wild die',sides:4,faces:[3,4],col:'#d4f7e6',acc:'#1f9e68',r:1,glyph:'W',tag:'WILD',desc:'A d4. On 3 or 4, once everything settles, a tails turns wild (heads for lines)'},
+  midas:{name:'Midas die',sides:10,faces:[9,10],col:'#ffe0b8',acc:'#c25a00',r:1,glyph:'×5',tag:'MIDAS',desc:'A d10. On 9 or 10, once everything settles, a tails turns golden (heads, pays ×5)'},
+  gamble:{name:'Gamble die',sides:12,faces:[1,12],col:'#ffd6e6',acc:'#c41f5a',r:1,glyph:'±',tag:'GAMBLE',desc:'A d12. Roll 12 and the whole press pays double; roll 1 and it pays half'}};
+const fxFace=d=>!!(d.fx&&!d.rolling&&FXD[d.fx].faces.includes(d.face));
 const countOf=t=>S.pouch.filter(x=>x===t).length;
 // plain coins are unlimited; the pouch holds only special coins, and every one of them is played each press
 // (if a press has fewer coins than specials, a random handful of specials make it). Positions are shuffled.
 let bag=[];
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 function drawPouch(n){const sp=shuffle([...S.pouch]).slice(0,n);while(sp.length<n)sp.push('plain');return shuffle(sp)}
-const S={...FRESH,sides:[],pouch:[...FRESH.pouch],parts:[]};
+const S={...FRESH,sides:[],pouch:[...FRESH.pouch],parts:[],fx:[]};
 const hasPart=id=>S.parts.includes(id);
 const score=new CountUp(0);
-const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');if(Array.isArray(d.parts))S.parts=d.parts.filter(id=>PARTS[id]).slice(0,PSLOTS);score.value=score.shown=+d.score||0}}catch(e){}
+const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');if(Array.isArray(d.parts))S.parts=d.parts.filter(id=>PARTS[id]).slice(0,PSLOTS);if(Array.isArray(d.fx))S.fx=d.fx.map(x=>FXD[x]?x:'');score.value=score.shown=+d.score||0}}catch(e){}
 S.sides=S.sides.slice(0,S.dice);while(S.sides.length<S.dice)S.sides.push(6);
+S.fx=S.fx.slice(0,S.dice);while(S.fx.length<S.dice)S.fx.push('');S.fx=S.fx.map((x,i)=>x&&FXD[x].sides===S.sides[i]?x:'');
 function save(){try{localStorage.setItem(KEY,JSON.stringify({...S,score:score.value}))}catch(e){}}
 const ROLL=.8,LAND_GAP=.2,FLIP=.42;
 const headsP=()=>.55+.05*S.luck;
@@ -334,7 +343,7 @@ const POOL=[
   {id:'rebate',r:1,max:3,dice:1,name:'Rebate',lvl:()=>S.rebate,desc:()=>S.rebate?`Up to ${S.rebate+1} max rolls per press refund a press`:'Rolling a max on any die refunds the press'},
   {id:'val',r:0,max:99,name:'Heavier coins',lvl:()=>S.val-1,desc:()=>`Heads pays ${fmt(S.val+1)} instead of ${fmt(S.val)}`},
   {id:'luck',r:0,max:5,name:'Lucky coins',lvl:()=>S.luck,desc:()=>`Heads chance ${pct()}% → ${pct()+5}%`},
-  {id:'poly',r:0,max:99,dice:1,name:'Polyhedral',lvl:()=>S.sides.reduce((a,v)=>a+SIDES.indexOf(v)-1,0),ok:()=>S.sides.some(v=>v<20),desc:()=>{const m=Math.min(...S.sides);return`Your smallest die, a d${m}, becomes a d${SIDES[SIDES.indexOf(m)+1]}`}},
+  {id:'poly',r:0,max:99,dice:1,name:'Polyhedral',lvl:()=>S.sides.reduce((a,v)=>a+SIDES.indexOf(v)-1,0),ok:()=>S.sides.some((v,i)=>v<20&&!S.fx[i]),desc:()=>{const m=Math.min(...S.sides.filter((v,i)=>!S.fx[i]));return`Your smallest die, a d${m}, becomes a d${SIDES[SIDES.indexOf(m)+1]}`}},
   {id:'reflip',r:1,max:3,name:'Second chance',lvl:()=>S.reflip,desc:()=>S.reflip?`${S.reflip+1} tails every press get flipped again`:'One tails every press gets flipped again'},
   {id:'loaded',r:1,max:3,dice:1,name:'Loaded dice',lvl:()=>S.minFace-1,desc:()=>`Dice never roll below ${S.minFace+1}`},
   ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1],['mirror',1,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Goes in your pouch and plays every press'})),
@@ -342,6 +351,8 @@ const POOL=[
   {id:'sixes',r:1,max:4,dice:1,name:'Max roll bonus',lvl:()=>S.sixes/2,desc:()=>`A die's highest roll (6 on a d6, 20 on a d20) adds ${S.sixes+2} bonus coins`},
   {id:'boom',r:1,max:3,dice:1,name:'Exploding dice',lvl:()=>S.boom,desc:()=>S.boom?`Max rolls can explode up to ${S.boom+1} times in a row`:'A max roll explodes: the die rolls again and adds to the count'},
   ...Object.entries(PARTS).map(([id,q])=>({id:'p_'+id,part:id,r:q.r,w:.6,max:1,dice:1,name:q.name,lvl:()=>hasPart(id)?1:0,desc:()=>q.desc+(S.parts.length>=PSLOTS?'. Parts full: swap one out':'')})),
+  ...Object.entries(FXD).map(([k,q])=>({id:'x_'+k,die:q.sides,fxd:k,r:q.r,w:.5,max:1,dice:1,name:q.name,lvl:()=>S.fx.includes(k)?1:0,
+    desc:()=>q.desc+(dice.length>=S.slots?'. Slots full: swap it in for one of your dice':'')})),
   {id:'chain',r:2,max:5,dice:1,name:'Hot streak',lvl:()=>S.chain,desc:()=>`Each heads in a row pays +${S.chain+1} more than the last`}
 ];
 const RW=[10,4.5,1.6];
@@ -371,8 +382,8 @@ const hudJ=world.add(new Juicy(200,46,{sk:500,sz:.3}));
 const barJ=world.add(new Juicy(200,98,{sk:500,sz:.35}));
 const at=(t,fn)=>events.push({t,fn});
 
-function addDie(popIn,sides=6){const j=world.add(new Juicy(innerWidth/2,playTop+40,{from:popIn?0:1,k:520,z:.33}));dice.push({j,sides,face:sides,rolling:false,ft:0,t0:0,lt:1,hl:popIn?1:0,size:44,hx:0,hy:0})}
-S.sides.forEach(v=>addDie(false,v));
+function addDie(popIn,sides=6,fx=''){const j=world.add(new Juicy(innerWidth/2,playTop+40,{from:popIn?0:1,k:520,z:.33}));dice.push({j,sides,fx,face:sides,rolling:false,ft:0,t0:0,lt:1,hl:popIn?1:0,size:44,hx:0,hy:0})}
+S.sides.forEach((v,i)=>addDie(false,v,S.fx[i]));
 
 function coinSlots(n){
   const top=coinTop,bot=playBot-24,w=trayW-28,h=Math.max(60,bot-top);let best=null;
@@ -418,7 +429,7 @@ function resetTray(){
   ph.paid=[];ph.miss=[];ph.lines=[];tease=null;
   if(dice.length)clearCoins();
   else coins.forEach(c=>{c.face=null;c.dim=0;c.hl=0;c.j.punch(5)});
-  dice.forEach(d=>d.hl=0);
+  dice.forEach(d=>{d.hl=0;d.armed=false});
 }
 let updPending=false;
 function setBusy(v){busy=v;refreshGo();if(!v&&updPending){updPending=false;setTimeout(doUpdate,300)}}
@@ -431,9 +442,9 @@ addEventListener('resize',()=>{if(over||lvlOpen)fitAll()});
 function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}$('#stLv').textContent=S.lv;$('#stBest').textContent='+'+fmt(S.best);$('#stRecord').textContent=bestLv;
   const short=need()-score.value;$('#ovTitle').textContent=short<=Math.max(2,need()*.2)?'SO CLOSE!':'OUT OF PRESSES';
   const sub=$('#ovSub');sub.textContent='';const line=t=>{const e=document.createElement('span');e.textContent=t;sub.appendChild(e)};
-  if(short<=Math.max(2,need()*.2))line(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)line(`Your machine: ${S.sides.map(v=>'d'+v).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
+  if(short<=Math.max(2,need()*.2))line(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)line(`Your machine: ${S.sides.map((v,i)=>S.fx[i]?FXD[S.fx[i]].name:'d'+v).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
-function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
+function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];busy=false;save();layout();const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)];sfx.buy()}
 function refreshGo(){const h=busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
   if(!h){go.classList.remove('ready');void go.offsetWidth;go.classList.add('ready');sfx.ready()}else go.classList.remove('down')}
@@ -441,7 +452,7 @@ function press(){
   if(lvlOpen||lvDelay>=0||busy)return;
   audio();
   if(score.value>=need()||(!calibrating()&&S.left<=0))return;
-  setBusy(true);S.presses++;if(calibrating())S.calib++;else S.left--;updateGoLabel();save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;
+  setBusy(true);S.presses++;if(calibrating())S.calib++;else S.left--;updateGoLabel();save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;ph.dq=[];ph.mult=1;dice.forEach(d=>d.armed=false);
   sfx.press();go.classList.remove('hit');void go.offsetWidth;go.classList.add('hit');
   if(!dice.length){
     let c=coins[0];
@@ -498,6 +509,9 @@ function landDie(d,v,mine,spill,seq=[v]){
   const maxed=seq.includes(d.sides),tot=seq.reduce((a,b)=>a+b,0);
   d.rolling=false;d.face=v;d.hl=1;d.j.p.x.t=d.hx;d.j.punch(16).shove(300);if(cfg.punch)d.j.r.x=(Math.random()<.5?-1:1)*.35;
   sfx.land(v===d.sides);world.shake(v===d.sides?.22:.13);
+  if(fxFace(d)){const q=FXD[d.fx];d.armed=true;bpulse(d,'fx');sfx.ping();
+    if(d.fx==='gamble')ph.mult*=v===12?2:.5;else ph.dq.push(d);
+    if(J)world.popText(d.fx==='gamble'?(v===12?'×2 PRESS':'½ PRESS'):q.tag+' READY',d.hx,d.hy-d.size*1.05,{size:Math.max(16,d.size*.4),ci:4,layers:2,life:1})}
   if(seq.length>1&&J)world.popText('= '+tot,d.hx,d.hy+d.size*1.05,{size:Math.max(24,d.size*.6),layers:2,kick:7,ci:3,life:1.1});
   if(hasPart('overclock')){partJ('overclock').punch(8);if(J)world.popText('×2',d.hx-d.size*.65,d.hy+d.size*.2,{size:Math.max(18,d.size*.4),ci:1,life:.8})}
   if(maxed&&S.sixes)bpulse(d,'sixes');if(S.minFace>1&&v<=S.minFace)bpulse(d,'loaded');
@@ -581,9 +595,10 @@ function spinBoard(){
   const cols=new Map();coins.forEach(c=>{if(!cols.has(c.col))cols.set(c.col,[]);cols.get(c.col).push(c)});
   const list=[...cols.entries()].sort((a,b)=>a[0]-b[0]).map(([,cs])=>cs.sort((a,b)=>a.row-b.row)).filter(cs=>cs.length>=2);
   if(!list.length){endPress();return}
-  const faces=dice.map(d=>d.face),dup=new Set(faces.filter((f,i)=>faces.indexOf(f)!==i));dice.forEach(d=>{if(dup.has(d.face)){d.hl=1;d.j.punch(14)}});
-  partHit('reels',false);sfx.open();world.shake(.35);hudJ.punch(6);
-  if(J)world.popText('DOUBLES! SPIN!',W/2,(coinTop+playBot)/2,{size:Math.min(52,W/8),layers:3,kick:9,life:1.1,ci:3});
+  const by=ph.spinBy;if(by){by.hl=1;by.j.punch(14)}
+  else{const faces=dice.map(d=>d.face),dup=new Set(faces.filter((f,i)=>faces.indexOf(f)!==i));dice.forEach(d=>{if(dup.has(d.face)){d.hl=1;d.j.punch(14)}})}
+  if(!by)partHit('reels',false);sfx.open();world.shake(.35);hudJ.punch(6);
+  if(J)world.popText(by?'SPIN!':'DOUBLES! SPIN!',W/2,(coinTop+playBot)/2,{size:Math.min(52,W/8),layers:3,kick:9,life:1.1,ci:3});
   ph.paid=[];ph.miss=[];coins.forEach(c=>{c.hl=0});
   const t0=T+.55;
   reels=list.map((cs,i)=>{const L=cs.length,cell=cs[0].cell||cs[0].r*2.4,k=1+Math.floor(Math.random()*(L-1));
@@ -605,6 +620,17 @@ function reelsLanded(){
     at(T+.1+n*.35,()=>{if(!l.paid)payLine(l)});n++});
   if(!n&&J)world.popText('NO NEW LINES',W/2,(coinTop+playBot)/2,{size:Math.min(30,W/13),ci:6,life:.9});
   at(T+.5+n*.35,endPress);
+}
+// an armed effect die fires: it punches, then changes the settled board
+function fireDie(d){
+  const q=FXD[d.fx];d.armed=false;d.hl=1;d.j.punch(18).wobble(.4);bpulse(d,'fx');sfx.fx(2);world.shake(.2);
+  const tails=coins.filter(o=>o.final&&o.res!=='h'),pick1=()=>tails[Math.floor(Math.random()*tails.length)];
+  if(d.fx==='spin'){ph.reelTrig=true;ph.spinBy=d;return}
+  if(!tails.length){if(J)world.popText('NO TAILS',d.hx,d.hy-d.size*1.05,{size:16,ci:6,life:.8});return}
+  if(J)world.popText(q.tag+'!',W/2,(coinTop+playBot)/2,{size:Math.min(48,W/8),layers:2,kick:8,life:1,ci:2});
+  const again=o=>{o.final=false;o.dim=0;o.face=null;o.copyVal=null;o.noAgain=true;ph.left++;o.j.punch(10)};
+  if(d.fx==='reflip')tails.forEach((o,i)=>{again(o);o.res=resFor(o.type);at(T+.15+i*.05,()=>startFlip(o))});
+  else{const o=pick1();again(o);o.type=d.fx==='wild'?'wild':'gold';o.res='h';o.hl=1;at(T+.2,()=>startFlip(o))}
 }
 // effects step: magnets pull first (they change results), then embers, then crowns — one at a time so you can watch it
 function effectsPhase(){
@@ -635,7 +661,8 @@ function runFx(c){
 function endPress(){
   if(ph.left>0){at(T+.2,endPress);return}
   // board-changing steps run in stages, only once everything on screen has settled:
-  // flips -> coin effects -> cascade waves (every queued line at once, up to 3 waves) -> slot reels -> (their lines may cascade) -> tally
+  // flips -> coin effects -> effect dice -> cascade waves (every queued line at once, up to 3 waves) -> slot reels -> (their lines may cascade) -> tally
+  if(ph.dq&&ph.dq.length){const q=ph.dq;ph.dq=[];let t=T+.25;q.forEach(d=>{at(t,()=>fireDie(d));t+=.75});at(t,endPress);return}
   if(ph.cq&&ph.cq.length){const fresh=[...new Set(ph.cq)];ph.cq=[];
     if((ph.casc||0)<3){ph.casc=(ph.casc||0)+1;ph.left+=fresh.length;at(T+.35,()=>cascadeLine(fresh));at(T+.6,endPress);return}}
   if(ph.reelTrig&&!ph.spun){ph.spun=true;spinBoard();return}
@@ -647,6 +674,10 @@ function endPress(){
     if(perfect){const bonus=ph.tot*(S.perf-1);payout(W/2,mid,bonus,Math.min(16,Math.max(6,bonus)));ph.tot+=bonus;hudJ.punch(14).shove(400);sfx.perfect();
       if(J){world.popText('PERFECT ×'+S.perf,W/2,mid,{size:Math.min(64,W/7.5),layers:3,kick:9,life:1.6});world.shake(.6)}}
     else hudJ.punch(8);
+    if(ph.mult!==1){const g=dice.find(d=>d.fx==='gamble'&&d.armed),delta=Math.round(ph.tot*(ph.mult-1));if(g){g.armed=false;g.j.punch(18);bpulse(g,'fx')}
+      if(delta>0)payout(W/2,mid+30,delta,Math.min(16,Math.max(6,delta)));else{score.add(delta);hudJ.punch(10).shove(300)}ph.tot+=delta;
+      if(delta>0){sfx.perfect();hudJ.punch(12)}else sfx.drain();
+      if(J){world.popText(ph.mult>1?'GAMBLE ×'+ph.mult:'GAMBLE ½',W/2,mid-40,{size:Math.min(50,W/9),layers:3,kick:9,life:1.4,ci:ph.mult>1?3:1});world.shake(.45)}}
     if(ph.seven){const bonus=ph.tot;payout(W/2,mid+30,bonus,Math.min(16,Math.max(6,bonus)));ph.tot+=bonus;partHit('sevens',false);sfx.perfect();hudJ.punch(12);
       if(J){world.popText(`${ph.sum}! LUCKY 7s ×2`,W/2,mid+(perfect?70:0),{size:Math.min(50,W/9),layers:3,kick:9,life:1.6,ci:0});world.shake(.5)}}
     if(ph.tot>S.best){if(S.presses>3&&J&&ph.n>1)world.popText('NEW BEST!',W/2,mid+48,{size:26,ci:1,life:1.1});S.best=ph.tot}
@@ -665,6 +696,7 @@ function iconFor(id,c){
     if(txt){g.fillStyle='#111';g.font=`${txt.length>2?14:18}px "Archivo Black", sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText(txt,x,y+1)}};
   const poly=(n,txt)=>{g.save();g.translate(30,30);polyPath(g,n,23);g.fillStyle=th.obj;g.save();g.translate(4,4);polyPath(g,n,23);g.fill();g.restore();polyPath(g,n,23);g.fillStyle='#fff';g.fill();g.stroke();g.fillStyle='#111';g.font='16px "Archivo Black", sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(txt,0,2);g.restore()};
   if(/^d\d+$/.test(id)){dieIcon(c,+id.slice(1),64);return}
+  if(id.startsWith('x_')){const k=id.slice(2);dieIcon(c,FXD[k].sides,64,k);return}
   if(id.startsWith('c_')){coinIcon(c,id.slice(2),64);return}
   if(id.startsWith('p_')){partIcon(c,id.slice(2),64);return}
   if(id==='boom'){g.fillStyle='#ff9f1c';g.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8,q=i%2?14:29;g.lineTo(30+Math.cos(a)*q,30+Math.sin(a)*q)}g.closePath();g.fill();g.stroke();die(14,14,32,6);return}
@@ -708,11 +740,11 @@ function pick(p,swapIdx){
   const mid=(coinTop+playBot)/2;
   if(p.coin){S.pouch.push(p.coin);bag=[];pouchBump()}
   else if(p.die){
-    if(swapIdx!==undefined){const d=dice[swapIdx];S.sides[swapIdx]=p.die;d.sides=p.die;d.face=p.die;d.j.pop();d.hl=1;sfx.land(true)}
-    else{S.dice++;S.sides.push(p.die);addDie(true,p.die);layout();if(S.dice===1)clearCoins()}
+    if(swapIdx!==undefined){const d=dice[swapIdx];S.sides[swapIdx]=p.die;S.fx[swapIdx]=p.fxd||'';d.fx=p.fxd||'';d.sides=p.die;d.face=p.die;d.j.pop();d.hl=1;sfx.land(true)}
+    else{S.dice++;S.sides.push(p.die);S.fx.push(p.fxd||'');addDie(true,p.die,p.fxd||'');layout();if(S.dice===1)clearCoins()}
   }else if(p.part){if(swapIdx!==undefined)S.parts[swapIdx]=p.part;else S.parts.push(p.part);S.left=budget();partJ(p.part).pop()
   }else({boom:()=>{S.boom++},val:()=>{S.val++},luck:()=>{S.luck++},reflip:()=>{S.reflip++},slots:()=>{S.slots++;layout()},rebate:()=>{S.rebate++},lines:()=>{S.lineMult++},
-    poly:()=>{const m=Math.min(...S.sides),i=S.sides.indexOf(m),nx=SIDES[SIDES.indexOf(m)+1];S.sides[i]=nx;dice[i].sides=nx;dice[i].face=nx;dice[i].j.pop();dice[i].hl=1},
+    poly:()=>{const m=Math.min(...S.sides.filter((v,k)=>!S.fx[k])),i=S.sides.findIndex((v,k)=>v===m&&!S.fx[k]),nx=SIDES[SIDES.indexOf(m)+1];S.sides[i]=nx;dice[i].sides=nx;dice[i].face=nx;dice[i].j.pop();dice[i].hl=1},
     loaded:()=>{S.minFace++},perf:()=>{S.perf++},sixes:()=>{S.sixes+=2},chain:()=>{S.chain++}})[p.id]();
   coins.forEach(c=>{c.j.punch(8);c.hl=1});dice.forEach(d=>{d.j.punch(8);d.hl=1});
   if(J){world.popText(p.name.toUpperCase()+'!',W/2,mid,{size:Math.min(44,W/10),layers:2,kick:6,life:1.3});world.shake(.3)}
@@ -723,8 +755,8 @@ function pick(p,swapIdx){
 function showSwap(p){
   cardsEl.hidden=true;rerollBtn.hidden=true;$('#swap').hidden=false;$('.sub').textContent=`Swap the d${p.die} in for which die?`;
   const row=$('#swapRow');row.innerHTML='';
-  dice.forEach((d,i)=>{const b=document.createElement('button');b.className='sw slab';const c=document.createElement('canvas');dieIcon(c,d.sides,56);
-    const l=document.createElement('span');l.textContent='d'+d.sides;b.append(c,l);b.addEventListener('click',()=>pick(p,i));row.appendChild(b)});
+  dice.forEach((d,i)=>{const b=document.createElement('button');b.className='sw slab';const c=document.createElement('canvas');dieIcon(c,d.sides,56,d.fx);
+    const l=document.createElement('span');l.textContent=d.fx?FXD[d.fx].name:'d'+d.sides;b.append(c,l);b.addEventListener('click',()=>pick(p,i));row.appendChild(b)});
   sfx.press();setTimeout(()=>{const f=row.querySelector('.sw');if(f)f.focus({preventScroll:true})},30);
 }
 function showPartSwap(p){
@@ -740,9 +772,9 @@ function coinIcon(c,type,size,minus){const g=c.getContext('2d');c.width=c.height
   const r=size*.34,col=COINS[type].col;g.translate(0,-r*.12);chunkBase(g,ellPts(r,r),r*.2,col,3);g.fillStyle=col;g.beginPath();g.arc(0,0,r,0,7);g.fill();g.lineWidth=3;g.stroke();
   g.lineWidth=2;g.beginPath();g.arc(0,0,r*.8,0,7);g.stroke();g.fillStyle='rgba(255,255,255,.5)';g.beginPath();g.ellipse(-r*.3,-r*.54,r*.25,r*.11,-.45,0,7);g.fill();
   if(minus){g.fillStyle='#111';g.font=`${Math.round(r*.8)}px "Archivo Black", sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('−2',0,2)}else glyph(g,type,r)}
-function dieIcon(c,n,size){const g=c.getContext('2d');c.width=c.height=size*2;g.scale(2,2);g.translate(size/2,size/2);g.lineWidth=3;g.strokeStyle=th.line;g.lineJoin='round';
-  const R=size*.36,P=diePts(n,R);g.translate(0,-R*.1);chunkBase(g,P,R*.22,DIECOL[n],3);ptsPath(g,P);g.fillStyle=DIECOL[n];g.fill();g.lineWidth=3;g.stroke();
-  g.fillStyle='#111';g.font=`${Math.round(size*.26)}px "Archivo Black", sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText(n===6?'6':String(n),0,n===4?size*.07:2)}
+function dieIcon(c,n,size,fx){const g=c.getContext('2d');c.width=c.height=size*2;g.scale(2,2);g.translate(size/2,size/2);g.lineWidth=3;g.strokeStyle=th.line;g.lineJoin='round';
+  const R=size*.36,P=diePts(n,R),col=fx?FXD[fx].col:DIECOL[n];g.translate(0,-R*.1);chunkBase(g,P,R*.22,col,3);ptsPath(g,P);g.fillStyle=col;g.fill();g.lineWidth=3;g.stroke();
+  g.fillStyle=fx?FXD[fx].acc:'#111';g.font=`${Math.round(size*.26)}px "Archivo Black", sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText(fx?FXD[fx].glyph:n===6?'6':String(n),0,n===4?size*.07:2)}
 $('#again').addEventListener('click',newRun);
 const pouchBtn=$('#pouchBtn'),pouchDlg=$('#pouchDlg');
 function pouchLabel(){return S.pouch.length?(innerWidth<420?`Pouch · ${S.pouch.length}`:`Pouch · ${S.pouch.length} special`):'Pouch'}
@@ -794,18 +826,19 @@ const DIECOL={4:'#fff',6:'#fff',8:'#c9f2ff',10:'#d9ffcf',12:'#ffe0f0',20:'#fff2b
 function drawDie(d){
   const j=d.j,t=j.xf(),s=d.size,R=s*.58;if(t.s<.02)return;const step=cycleIndex(),a=J?Math.max(j.motion,d.hl,d.rolling?1:0):0,lw=Math.max(2,s*.06);
   if(cfg.shadow&&a>.02)for(let L=cfg.layers-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*s/40);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y);ctx.rotate(q.r+(d.rolling?d.spin*.8:0));ctx.scale(q.s,q.s);polyPath(ctx,d.sides,R);ctx.fillStyle=pal(step+j.ci+L*2);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
-  const ang=t.r+(d.rolling?d.spin:0),dep=Math.max(4,s*.16),col=DIECOL[d.sides],P=rotPts(diePts(d.sides,R),ang),clw=Math.max(3,s*.085);
+  const ang=t.r+(d.rolling?d.spin:0),dep=Math.max(4,s*.16),col=d.fx?FXD[d.fx].col:DIECOL[d.sides],ef=fxFace(d),acc=d.fx?FXD[d.fx].acc:'#111',P=rotPts(diePts(d.sides,R),ang),clw=Math.max(3,s*.085);
   ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);
+  if(d.armed){const k=1+Math.sin(tA*9)*.06;ctx.save();ctx.globalAlpha=.85;ctx.lineWidth=Math.max(3,s*.09);ctx.strokeStyle=acc;ctx.setLineDash([s*.16,s*.1]);ctx.lineDashOffset=-tA*40;ctx.beginPath();ctx.arc(0,dep*.4,s*.88*k,0,7);ctx.stroke();ctx.restore()}
   chunkBase(ctx,P,dep,col,clw);ptsPath(ctx,P);ctx.fillStyle=col;ctx.fill();ctx.lineWidth=clw;ctx.strokeStyle=th.line;ctx.stroke();
   ctx.rotate(ang);
-  if(col!=='#fff'){ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineCap='round';ctx.lineWidth=Math.max(2,s*.07);ctx.beginPath();ctx.moveTo(-R*.4,-R*.16);ctx.lineTo(-R*.2,-R*.4);ctx.stroke()}
+  if(col!=='#fff'&&!d.fx){ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineCap='round';ctx.lineWidth=Math.max(2,s*.07);ctx.beginPath();ctx.moveTo(-R*.4,-R*.16);ctx.lineTo(-R*.2,-R*.4);ctx.stroke()}
   const top=d.face===d.sides&&!d.rolling;
-  if(d.sides===6){ctx.fillStyle=d.face===1?'#ff4b3e':'#111';for(const[px,py]of PIPS[d.face]){ctx.beginPath();ctx.arc(px*s*.27,py*s*.27,s*.1,0,7);ctx.fill()}}
+  if(d.sides===6){ctx.fillStyle=ef?acc:d.face===1?'#ff4b3e':'#111';for(const[px,py]of PIPS[d.face]){ctx.beginPath();ctx.arc(px*s*.27,py*s*.27,s*.1,0,7);ctx.fill()}}
   else{const txt=String(d.face);ctx.font=`${Math.round(s*(txt.length>1?.4:.5))}px "Archivo Black", Impact, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle=top?'#ff4b3e':'#111';ctx.fillText(txt,0,d.sides===4?s*.12:s*.03)}
+    ctx.fillStyle=ef?acc:top?'#ff4b3e':'#111';ctx.fillText(txt,0,d.sides===4?s*.12:s*.03)}
   ctx.restore();
   drawBadges(d,t);
-  if(!d.rolling&&d.sides!==6){ctx.font='11px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.fillStyle=th.hint;ctx.fillText('d'+d.sides,d.hx,d.hy+s*.86+4+(S.boom||S.minFace>1||S.sixes?Math.max(8,s*.21)+2:0))}
+  if(!d.rolling&&d.sides!==6){ctx.font='11px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.fillStyle=th.hint;ctx.fillText('d'+d.sides,d.hx,d.hy+s*.86+4+(d.fx||S.boom||S.minFace>1||S.sixes?Math.max(8,s*.21)+2:0))}
 }
 function glyph(g,type,r,dir){
   g.fillStyle='#111';g.strokeStyle='#111';g.textAlign='center';g.textBaseline='middle';
@@ -867,14 +900,14 @@ function drawZones(){zones.forEach((z,i)=>{const x=z.x-z.w/2,y=z.y-z.h/2+z.h*.04
 // perk badges on every die: a row of little stickers under it, one per die-changing perk; they pulse when the perk fires
 const bpulse=(d,k)=>{(d.bp||(d.bp={}))[k]=1};
 function drawBadges(d,t){
-  const list=[];if(S.boom)list.push('boom');if(S.minFace>1)list.push('loaded');if(S.sixes)list.push('sixes');if(!list.length||t.s<.05)return;
+  const list=[];if(d.fx)list.push('fx');if(S.boom)list.push('boom');if(S.minFace>1)list.push('loaded');if(S.sixes)list.push('sixes');if(!list.length||t.s<.05)return;
   const s=d.size,R=Math.max(8,s*.21);
   list.forEach((k,i)=>{const p=(d.bp&&d.bp[k])||0,sc=t.s*(1+.6*p*p),x=t.x+(i-(list.length-1)/2)*(R*2+3),y=t.y+s*.66;
     ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);ctx.lineWidth=Math.max(2,R*.24);ctx.strokeStyle=th.line;ctx.lineJoin='round';
     if(k==='boom'){ctx.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8-Math.PI/2,q=i%2?R*.7:R*1.15;ctx.lineTo(Math.cos(a)*q,Math.sin(a)*q)}ctx.closePath();ctx.fillStyle='#ff9f1c';ctx.fill();ctx.stroke()}
-    else{ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fillStyle=k==='loaded'?'#a9b4c4':'#3ddc97';ctx.fill();ctx.stroke()}
-    const txt=k==='boom'?(S.boom>1?String(S.boom):''):k==='loaded'?'≥'+S.minFace:'+'+S.sixes;
-    if(txt){ctx.fillStyle='#111';ctx.font=`${Math.round(R*(txt.length>1?.95:1.15))}px "Archivo Black", sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,R*.06)}
+    else{ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fillStyle=k==='fx'?FXD[d.fx].acc:k==='loaded'?'#a9b4c4':'#3ddc97';ctx.fill();ctx.stroke()}
+    const txt=k==='fx'?FXD[d.fx].glyph:k==='boom'?(S.boom>1?String(S.boom):''):k==='loaded'?'≥'+S.minFace:'+'+S.sixes;
+    if(txt){ctx.fillStyle=k==='fx'?'#fff':'#111';ctx.font=`${Math.round(R*(txt.length>1?.95:1.15))}px "Archivo Black", sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,R*.06)}
     ctx.restore()});
 }
 function drawBar(){
@@ -965,7 +998,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126042619';let updShown=false,updDismissed='';
+const BUILD='20261126044034';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1005,7 +1038,7 @@ $('#tSkin').addEventListener('click',()=>{skin=skin==='dark'?'light':'dark';appl
 applySkin();
 let resetArm=-1e9;
 $('#tReset').addEventListener('click',e=>{const b=e.currentTarget;if(performance.now()-resetArm>2500){resetArm=performance.now();b.textContent='Tap again to reset';return}
-  b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
+  b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   lvlOpen=false;lvDelay=-1;lvlEl.classList.remove('open');over=false;overDelay=-1;$('#over').classList.remove('open');
   S.sides=[];dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];setBusy(false);save();layout();
   const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)]});
