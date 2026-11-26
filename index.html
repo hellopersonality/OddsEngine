@@ -184,7 +184,7 @@ button{font:inherit;color:var(--ink)}
   <div id="instBody" style="display:grid;gap:12px"></div>
   <button id="instLater" class="slab mbtn sec" style="min-height:48px;font-size:17px">Not now</button>
 </div></div>
-<div id="ui"><button id="go" class="slab bright"><span id="goTxt"><span id="goLbl">FLIP</span><small id="goLeft"></small></span><span id="goSlots" aria-hidden="true"></span></button></div>
+<div id="ui"><button id="go" class="slab bright"><span id="goTxt"><span id="goLbl">PLAY</span><small id="goLeft"></small></span><span id="goSlots" aria-hidden="true"></span></button></div>
 <div id="lvl" role="dialog" aria-modal="true" aria-labelledby="lvTitle">
   <div id="lvBox">
     <h2 id="lvTitle">LEVEL 2</h2>
@@ -481,7 +481,7 @@ function layout(first){
   updateGoLabel();
 }
 function updateGoLabel(){const n=dice.length,l=S.left,c=calibrating(),slots=c?0:Math.max(budget(),l);
-  $('#goLbl').textContent=!c&&l===1?'LAST':n?'ROLL':'FLIP';
+  $('#goLbl').textContent=!c&&l===1?'LAST':'PLAY';
   $('#goLeft').textContent=c?'free flips this level':`${l}/${slots} LEFT`;go.classList.toggle('last',!c&&l===1);go.classList.toggle('slots',!c);renderSlots(slots)}
 // press tokens: one per press left, filling from the left; used slots show a faint no-sign; refunded ones are blue
 const NOSIGN='<svg viewBox="0 0 26 26"><circle cx="13" cy="13" r="10" fill="none" stroke="currentColor" stroke-width="3.5"></circle><path d="M6 20 L20 6" stroke="currentColor" stroke-width="3.5"></path></svg>';
@@ -1144,7 +1144,7 @@ function draw(){
   rr(ctx,trayX+bz,playTop+bz,trayW-bz*2,TH-bz*2,18);ctx.fillStyle=th.tray;ctx.fill();
   ctx.save();ctx.clip();ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(trayX,playTop+bz,trayW,11);ctx.restore();
   rr(ctx,trayX+bz,playTop+bz,trayW-bz*2,TH-bz*2,18);ctx.lineWidth=4;ctx.strokeStyle=th.line;ctx.stroke();
-  if(!S.presses){ctx.fillStyle=th.hint;ctx.font='700 14px "Space Grotesk", sans-serif';ctx.textAlign='center';ctx.fillText('tap FLIP and watch it play out',W/2,playBot-24)}
+  if(!S.presses){ctx.fillStyle=th.hint;ctx.font='700 14px "Space Grotesk", sans-serif';ctx.textAlign='center';ctx.fillText('tap PLAY and watch it play out',W/2,playBot-24)}
   drawZones();dice.forEach(drawDie);fading.forEach(drawCoin);coins.forEach(c=>{if(!tease||c!==tease.c)drawCoin(c)});drawLines();if(tease)drawCoin(tease.c);
   world.drawCoins(ctx);
   drawBar();drawStats();drawParts();
@@ -1306,7 +1306,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126165217';let updShown=false,updDismissed='';
+const BUILD='20261126165409';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
