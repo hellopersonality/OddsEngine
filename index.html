@@ -244,13 +244,11 @@ class Juicy{
 }
 // neo-brutalist sticker: colour fill + thick black outline; lagging shadow copies in palette colours, also outlined
 // live: 1 = colour-cycling (scoring), 0 = the calm UI colours; in between they cross-fade
-// ghost: shadow copies are drawn without an outline and fade out as the sticker settles (used by the score banner)
-function drawSticker(ctx,j,text,size,font='"Archivo Black", Impact, sans-serif',live=1,ghost=false){
+// shadows=false: no lagging colour copies (the score banner)
+function drawSticker(ctx,j,text,size,font='"Archivo Black", Impact, sans-serif',live=1,shadows=true){
   const step=cycleIndex()+j.ci,fill=(c,calm)=>{if(live<1){ctx.fillStyle=calm;ctx.fillText(text,0,0)}if(live>0){const a=ctx.globalAlpha;ctx.globalAlpha=a*live;ctx.fillStyle=c;ctx.fillText(text,0,0);ctx.globalAlpha=a}};
   ctx.font=`${size}px ${font}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
-  if(cfg.shadow)for(let L=Math.min(cfg.layers,3)-1;L>=0;L--){const t=j.shadowXf(L,cfg.offset*size/44*(ghost?1.45:1));
-    if(ghost){const h=j.sh[L],mv=Math.min(1,Math.hypot(h.x.x-j.p.x.x,h.y.x-j.p.y.x)/(size*.25)),a=Math.max(live,mv)*.85;if(a<.02)continue;
-      ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);ctx.globalAlpha*=a;ctx.fillStyle=pal(step+5+L*2);ctx.fillText(text,0,0);ctx.restore();continue}
+  if(cfg.shadow&&shadows)for(let L=Math.min(cfg.layers,3)-1;L>=0;L--){const t=j.shadowXf(L,cfg.offset*size/44);
     ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);ctx.lineWidth=size*.24;ctx.strokeStyle='#0d0a18';ctx.strokeText(text,0,0);fill(pal(step+5+L*2),th.rim);ctx.restore()}
   const t=j.xf();ctx.save();ctx.translate(t.x,t.y+size*.1);ctx.rotate(t.r);ctx.scale(t.s,t.s);ctx.lineWidth=size*.28;ctx.strokeStyle='#0d0a18';ctx.strokeText(text,0,0);ctx.fillStyle='#0d0a18';ctx.fillText(text,0,0);ctx.restore();
   ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);
@@ -1235,7 +1233,7 @@ function draw(){
     drawFlames(sz);
     if(J&&heat>.3){ctx.save();ctx.font=`${sz}px "Archivo Black", Impact, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.globalAlpha=Math.min(.8,(heat-.3)*1.4);
       ctx.lineWidth=sz*(.34+.06*Math.sin(tA*18));ctx.strokeStyle=heat>=1?'#ff1100':'#ff9300';ctx.translate(x,y);ctx.scale(k,k);ctx.strokeText(score.text,0,0);ctx.restore()}
-    ctx.save();ctx.translate(x+(Math.random()*2-1)*jt,y+(Math.random()*2-1)*jt);ctx.scale(k,k);ctx.translate(-x,-y);drawSticker(ctx,hudJ,score.text,sz,undefined,scoreLive,true);ctx.restore()}
+    ctx.save();ctx.translate(x+(Math.random()*2-1)*jt,y+(Math.random()*2-1)*jt);ctx.scale(k,k);ctx.translate(-x,-y);drawSticker(ctx,hudJ,score.text,sz,undefined,scoreLive,false);ctx.restore()}
   world.drawPops(ctx);
 }
 
@@ -1389,7 +1387,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126194310';let updShown=false,updDismissed='';
+const BUILD='20261126194445';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
