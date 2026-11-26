@@ -42,6 +42,23 @@ button{font:inherit;color:var(--ink)}
 #go.hit{animation:hit .2s}
 #go{display:grid;place-content:center;gap:4px}
 #go small{font:700 13px/1 "Space Grotesk",sans-serif;letter-spacing:0}
+/* the press button holds one token per press left, set into slots in the button itself */
+#goTxt{display:grid;gap:4px;justify-items:center}
+#go.slots{display:flex;align-items:center;justify-content:space-between;padding:0 clamp(10px,3.4vw,14px) 0 clamp(14px,4.6vw,20px);--gs:clamp(30px,9.6vw,42px)}
+#go.slots #goTxt{justify-items:start;gap:6px}#go.slots #goLbl{font-size:clamp(24px,8vw,34px)}
+#go.slots small{padding:4px 7px;background:var(--btn);color:#0b0b0f;border:3px solid var(--line);border-radius:6px;font:11px/1 "Archivo Black",sans-serif;letter-spacing:.04em}
+#goSlots{display:none;gap:clamp(4px,1.4vw,6px)}#go.slots #goSlots{display:flex}
+.gs{position:relative;width:var(--gs);height:var(--gs);border-radius:10px;background:#2a2340;border:3px solid var(--line);box-shadow:inset 0 4px 0 rgba(0,0,0,.5);box-sizing:border-box;display:grid;place-items:center}
+.gs.free{box-shadow:inset 0 4px 0 rgba(0,0,0,.5),0 0 0 3px #00b7f0}
+.gs svg{width:62%;height:62%;opacity:.2}
+.tk{position:relative;width:74%;height:74%;border-radius:50%;background:#ffd400;border:3px solid var(--line);box-sizing:border-box;box-shadow:0 3px 0 #b38f00,0 3px 0 3px var(--line);display:grid;place-items:center;font:calc(var(--gs)*.26)/1 "Archivo Black",sans-serif;color:#0b0b0f}
+.tk::after{content:'';position:absolute;left:18%;top:12%;width:32%;height:18%;border-radius:50%;background:rgba(255,255,255,.6)}
+.gs.free .tk{background:#00b7f0;box-shadow:0 3px 0 #007aa3,0 3px 0 3px var(--line)}
+#go.last .tk{background:#ff2a1a;box-shadow:0 3px 0 #a8140a,0 3px 0 3px var(--line)}
+.tk.in{animation:tkIn .38s cubic-bezier(.2,1.8,.4,1) both}
+@keyframes tkIn{0%{scale:0;translate:0 -60%}100%{scale:1;translate:0 0}}
+.tkFly{position:fixed;z-index:9;pointer-events:none;animation:tkFly .7s cubic-bezier(.2,.6,.4,1) forwards}
+@keyframes tkFly{0%{transform:translate(0,0) rotate(0) scale(1);opacity:1}60%{opacity:1}100%{transform:translate(26px,-150px) rotate(320deg) scale(1.25);opacity:0}}
 #go.last{background:#ff1100}
 #swap{width:100%;display:grid;gap:14px;justify-items:center}#swap[hidden]{display:none}
 #cards[hidden],#reroll[hidden],#skipUp[hidden]{display:none}
@@ -167,7 +184,7 @@ button{font:inherit;color:var(--ink)}
   <div id="instBody" style="display:grid;gap:12px"></div>
   <button id="instLater" class="slab mbtn sec" style="min-height:48px;font-size:17px">Not now</button>
 </div></div>
-<div id="ui"><button id="go" class="slab bright"><span id="goLbl">FLIP</span><small id="goLeft"></small></button></div>
+<div id="ui"><button id="go" class="slab bright"><span id="goTxt"><span id="goLbl">FLIP</span><small id="goLeft"></small></span><span id="goSlots" aria-hidden="true"></span></button></div>
 <div id="lvl" role="dialog" aria-modal="true" aria-labelledby="lvTitle">
   <div id="lvBox">
     <h2 id="lvTitle">LEVEL 2</h2>
@@ -463,8 +480,24 @@ function layout(first){
   coins.forEach((c,i)=>{const s=sl[i];c.tx=s.x;c.ty=s.y;c.r=s.r;if(!c.hidden)c.j.moveTo(s.x,s.y)});
   updateGoLabel();
 }
-function updateGoLabel(){const n=dice.length,l=S.left,c=calibrating();$('#goLbl').textContent=(!c&&l===1?'LAST ':'')+(n?'ROLL':'FLIP');
-  $('#goLeft').textContent=c?'free flips this level':l===1?'final press this level':`${l} presses left`;go.classList.toggle('last',!c&&l===1)}
+function updateGoLabel(){const n=dice.length,l=S.left,c=calibrating(),slots=c?0:Math.max(budget(),l);
+  $('#goLbl').textContent=!c&&l===1?'LAST':n?'ROLL':'FLIP';
+  $('#goLeft').textContent=c?'free flips this level':`${l}/${slots} LEFT`;go.classList.toggle('last',!c&&l===1);go.classList.toggle('slots',!c);renderSlots(slots)}
+// press tokens: one per press left, filling from the left; used slots show a faint no-sign; refunded ones are blue
+const NOSIGN='<svg viewBox="0 0 26 26"><circle cx="13" cy="13" r="10" fill="none" stroke="currentColor" stroke-width="3.5"></circle><path d="M6 20 L20 6" stroke="currentColor" stroke-width="3.5"></path></svg>';
+let slotsShown=-1,slotsKey='';
+function renderSlots(n){const box=$('#goSlots'),key=n+'|'+S.left+'|'+[...freePips].join(',');if(key===slotsKey)return;
+  const prev=slotsShown,old=[...box.children].map(e=>e.getBoundingClientRect());slotsKey=key;
+  // tokens that just left fly off from where their slot was
+  if(prev>S.left&&old.length&&!go.classList.contains('wait'))for(let i=S.left;i<Math.min(prev,old.length);i++){const r=old[i],f=document.createElement('span');f.className='gs tkFly';
+    f.style.cssText=`left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;background:none;border:0;box-shadow:none;--gs:${r.width}px`;f.innerHTML='<span class="tk" style="width:74%;height:74%">★</span>';document.body.appendChild(f);setTimeout(()=>f.remove(),760)}
+  box.innerHTML='';
+  for(let i=0;i<n;i++){const g=document.createElement('span');g.className='gs'+(i<S.left&&freePips.has(i)?' free':'');
+    if(i<S.left){const t=document.createElement('span');t.className='tk';t.textContent=freePips.has(i)?'+':'★';
+      // new tokens pop in (a refill staggers them in once the button is back)
+      if(i>=prev){t.classList.add('in');t.style.animationDelay=(prev<=0||S.left-prev>1?.25+i*.08:0)+'s'}g.appendChild(t)}
+    else g.innerHTML=NOSIGN;box.appendChild(g)}
+  slotsShown=S.left}
 function makeCoin(x,y,s,hidden){const j=world.add(new Juicy(x,y,{from:0,k:430,z:.55}));if(hidden)j.s.t=0;else j.pop();
   return{id:++coinId,j,r:s.r,tx:s.x,ty:s.y,face:null,res:null,gold:false,flipping:false,t0:0,dur:FLIP,dim:0,hl:0,hidden}}
 function spawnCoin(c){c.hidden=false;c.j.s.t=1;c.j.s.v+=8;c.j.moveTo(c.tx,c.ty);c.j.wobble(.45)}
@@ -503,7 +536,7 @@ function press(){
   if(menuOpen||lvlOpen||lvDelay>=0||busy)return;
   audio();
   if(score.value>=need()||(!calibrating()&&S.left<=0))return;
-  setBusy(true);S.presses++;if(calibrating())S.calib++;else{S.left--;freePips.delete(S.left)}updateGoLabel();save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;ph.dq=[];ph.mult=1;dice.forEach(d=>{d.armed=false;d.refunded=false});
+  S.presses++;if(calibrating())S.calib++;else{S.left--;freePips.delete(S.left)}updateGoLabel();setBusy(true);save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;ph.dq=[];ph.mult=1;dice.forEach(d=>{d.armed=false;d.refunded=false});
   sfx.press();go.classList.remove('hit');void go.offsetWidth;go.classList.add('hit');
   if(!dice.length){
     let c=coins[0];
@@ -1114,7 +1147,7 @@ function draw(){
   if(!S.presses){ctx.fillStyle=th.hint;ctx.font='700 14px "Space Grotesk", sans-serif';ctx.textAlign='center';ctx.fillText('tap FLIP and watch it play out',W/2,playBot-24)}
   drawZones();dice.forEach(drawDie);fading.forEach(drawCoin);coins.forEach(c=>{if(!tease||c!==tease.c)drawCoin(c)});drawLines();if(tease)drawCoin(tease.c);
   world.drawCoins(ctx);
-  drawBar();drawPips();drawStats();drawParts();
+  drawBar();drawStats();drawParts();
   {const sz=Math.min(56*UI.k,W/7),x=hudJ.p.x.x,y=hudJ.p.y.x,h=Math.min(1.6,heat),k=1+.08*h,jt=h>.45?(h-.4)*2.6:0;
     drawFlames(sz);
     if(J&&heat>.3){ctx.save();ctx.font=`${sz}px "Archivo Black", Impact, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.globalAlpha=Math.min(.8,(heat-.3)*1.4);
@@ -1273,7 +1306,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126162213';let updShown=false,updDismissed='';
+const BUILD='20261126165217';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
