@@ -323,11 +323,16 @@ const countOf=t=>S.pouch.filter(x=>x===t).length;
 let bag=[];
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 function drawPouch(n){const sp=shuffle([...S.pouch]).slice(0,n);while(sp.length<n)sp.push('plain');return shuffle(sp)}
-const S={...FRESH,sides:[],pouch:[...FRESH.pouch],parts:[],fx:[]};
+const S={...FRESH,sides:[],pouch:[...FRESH.pouch],parts:[],fx:[],dp:[]};
+// die upgrades belong to each die: boom = explosions in a row, reb = refunds on a max, min = lowest face, six = bonus coins on a max
+const newPerks=()=>({boom:0,reb:0,min:1,six:0});
 const hasPart=id=>S.parts.includes(id);
 const score=new CountUp(0);
-const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');if(Array.isArray(d.parts))S.parts=d.parts.filter(id=>PARTS[id]).slice(0,PSLOTS);if(Array.isArray(d.fx))S.fx=d.fx.map(x=>FXD[x]?x:'');score.value=score.shown=+d.score||0}}catch(e){}
+const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');if(Array.isArray(d.parts))S.parts=d.parts.filter(id=>PARTS[id]).slice(0,PSLOTS);if(Array.isArray(d.fx))S.fx=d.fx.map(x=>FXD[x]?x:'');
+  // older saves had shared die upgrades: every die owned then keeps them
+  S.dp=Array.isArray(d.dp)?d.dp.map(o=>({boom:+o.boom||0,reb:+o.reb?1:0,min:Math.max(1,+o.min||1),six:+o.six||0})):(d.sides||[]).map(()=>({boom:+d.boom||0,reb:+d.rebate?1:0,min:Math.max(1,+d.minFace||1),six:+d.sixes||0}));score.value=score.shown=+d.score||0}}catch(e){}
 S.sides=S.sides.slice(0,S.dice);while(S.sides.length<S.dice)S.sides.push(6);
+S.dp=S.dp.slice(0,S.dice);while(S.dp.length<S.dice)S.dp.push(newPerks());
 S.fx=S.fx.slice(0,S.dice);while(S.fx.length<S.dice)S.fx.push('');S.fx=S.fx.map((x,i)=>x&&FXD[x].sides===S.sides[i]?x:'');
 function save(){try{localStorage.setItem(KEY,JSON.stringify({...S,score:score.value}))}catch(e){}}
 const ROLL=.8,LAND_GAP=.2,FLIP=.42;
@@ -347,21 +352,23 @@ const POOL=[
     desc:()=>!S.dice?`Its roll (1–${n}) decides how many coins flip`:dice.length>=S.slots?`Slots full: swap it in for one of your dice`:`Adds a d${n} to the machine (slot ${dice.length+1} of ${S.slots})`})),
   {id:'lines',r:1,max:3,dice:1,name:'Paylines',lvl:()=>S.lineMult-3,desc:()=>`Lines of heads (any row, column or diagonal) pay ×${S.lineMult+1} instead of ×${S.lineMult}`},
   {id:'slots',r:2,max:3,dice:1,name:'Bigger table',lvl:()=>S.slots-5,ok:()=>dice.length>=S.slots-1,desc:()=>`Randomizer slots ${S.slots} → ${S.slots+1}`},
-  {id:'rebate',r:1,max:3,dice:1,name:'Rebate',lvl:()=>S.rebate,desc:()=>S.rebate?`Up to ${S.rebate+1} max rolls per press refund a press`:'Rolling a max on any die refunds the press'},
+  {id:'rebate',r:1,max:1,dice:1,name:'Rebate',lvl:()=>dlv('reb'),desc:()=>'Your dice: a max roll gives the press back (once per die per press). Dice added later start without it'},
   {id:'val',r:0,max:99,name:'Heavier coins',lvl:()=>S.val-1,desc:()=>`Heads pays ${fmt(S.val+1)} instead of ${fmt(S.val)}`},
   {id:'luck',r:0,max:5,name:'Lucky coins',lvl:()=>S.luck,desc:()=>`Heads chance ${pct()}% → ${pct()+5}%`},
   {id:'poly',r:0,max:99,dice:1,name:'Polyhedral',lvl:()=>S.sides.reduce((a,v)=>a+SIDES.indexOf(v)-1,0),ok:()=>S.sides.some((v,i)=>v<20&&!S.fx[i]),desc:()=>{const m=Math.min(...S.sides.filter((v,i)=>!S.fx[i]));return`Your smallest die, a d${m}, becomes a d${SIDES[SIDES.indexOf(m)+1]}`}},
   {id:'reflip',r:1,max:3,name:'Second chance',lvl:()=>S.reflip,desc:()=>S.reflip?`${S.reflip+1} tails every press get flipped again`:'One tails every press gets flipped again'},
-  {id:'loaded',r:1,max:3,dice:1,name:'Loaded dice',lvl:()=>S.minFace-1,desc:()=>`Dice never roll below ${S.minFace+1}`},
+  {id:'loaded',r:1,max:3,dice:1,name:'Loaded dice',lvl:()=>dlv('min')-1,desc:()=>'Your dice: their lowest possible roll goes up by 1. Dice added later start without it'},
   ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1],['mirror',1,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Goes in your pouch and plays every press'})),
   {id:'perf',r:1,max:4,dice:1,name:'Perfectionist',lvl:()=>S.perf-2,desc:()=>`All heads pays ×${S.perf+1} instead of ×${S.perf}`},
-  {id:'sixes',r:1,max:4,dice:1,name:'Max roll bonus',lvl:()=>S.sixes/2,desc:()=>`A die's highest roll (6 on a d6, 20 on a d20) adds ${S.sixes+2} bonus coins`},
-  {id:'boom',r:1,max:3,dice:1,name:'Exploding dice',lvl:()=>S.boom,desc:()=>S.boom?`Max rolls can explode up to ${S.boom+1} times in a row`:'A max roll explodes: the die rolls again and adds to the count'},
+  {id:'sixes',r:1,max:4,dice:1,name:'Max roll bonus',lvl:()=>dlv('six')/2,desc:()=>'Your dice: a max roll (6 on a d6, 20 on a d20) adds 2 more bonus coins. Dice added later start without it'},
+  {id:'boom',r:1,max:3,dice:1,name:'Exploding dice',lvl:()=>dlv('boom'),desc:()=>'Your dice: a max roll explodes one more time in a row (rolls again and adds). Dice added later start without it'},
   ...Object.entries(PARTS).map(([id,q])=>({id:'p_'+id,part:id,r:q.r,w:.6,max:1,dice:1,name:q.name,lvl:()=>hasPart(id)?1:0,desc:()=>q.desc+(S.parts.length>=PSLOTS?'. Parts full: swap one out':'')})),
   ...Object.entries(FXD).map(([k,q])=>({id:'x_'+k,die:q.sides,fxd:k,r:q.r,w:.5,max:1,dice:1,name:q.name,lvl:()=>S.fx.includes(k)?1:0,
     desc:()=>q.desc+(dice.length>=S.slots?'. Slots full: swap it in for one of your dice':'')})),
   {id:'chain',r:2,max:5,dice:1,name:'Hot streak',lvl:()=>S.chain,desc:()=>`Each heads in a row pays +${S.chain+1} more than the last`}
 ];
+// a die upgrade's card level is its lowest level across the dice you own, so it keeps coming until every die has it
+const dlv=k=>dice.length?Math.min(...dice.map(d=>d.p[k])):0;
 const RW=[10,4.5,1.6];
 function drawOffers(){
   const avail=POOL.filter(p=>p.lvl()<p.max&&(!p.dice||S.dice>0)&&(!p.ok||p.ok())),out=[];
@@ -389,8 +396,8 @@ const hudJ=world.add(new Juicy(200,46,{sk:500,sz:.3}));
 const barJ=world.add(new Juicy(200,98,{sk:500,sz:.35}));
 const at=(t,fn)=>events.push({t,fn});
 
-function addDie(popIn,sides=6,fx=''){const j=world.add(new Juicy(innerWidth/2,playTop+40,{from:popIn?0:1,k:520,z:.33}));dice.push({j,sides,fx,face:sides,rolling:false,ft:0,t0:0,lt:1,hl:popIn?1:0,size:44,hx:0,hy:0})}
-S.sides.forEach((v,i)=>addDie(false,v,S.fx[i]));
+function addDie(popIn,sides=6,fx='',p=newPerks()){const j=world.add(new Juicy(innerWidth/2,playTop+40,{from:popIn?0:1,k:520,z:.33}));dice.push({j,sides,fx,p,face:sides,rolling:false,ft:0,t0:0,lt:1,hl:popIn?1:0,size:44,hx:0,hy:0})}
+S.sides.forEach((v,i)=>addDie(false,v,S.fx[i],S.dp[i]));
 
 function coinSlots(n){
   const top=coinTop,bot=playBot-24,w=trayW-28,h=Math.max(60,bot-top);let best=null;
@@ -425,7 +432,7 @@ function makeCoin(x,y,s,hidden){const j=world.add(new Juicy(x,y,{from:0,k:430,z:
   return{id:++coinId,j,r:s.r,tx:s.x,ty:s.y,face:null,res:null,gold:false,flipping:false,t0:0,dur:FLIP,dim:0,hl:0,hidden}}
 function spawnCoin(c){c.hidden=false;c.j.s.t=1;c.j.s.v+=8;c.j.moveTo(c.tx,c.ty);c.j.wobble(.45)}
 function clearCoins(){coins.forEach(c=>{c.j.hide();fading.push(c)});coins=[]}
-const roll=d=>{const lo=Math.min(S.minFace,d.sides);return lo+Math.floor(Math.random()*(d.sides-lo+1))};
+const roll=d=>{const lo=Math.min(d.p.min,d.sides);return lo+Math.floor(Math.random()*(d.sides-lo+1))};
 const anyFace=d=>1+Math.floor(Math.random()*d.sides);
 const nbrs=c=>coins.filter(o=>o!==c&&Math.hypot(o.tx-c.tx,o.ty-c.ty)<(c.cell||999)*1.15);
 
@@ -451,7 +458,7 @@ function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setIt
   const sub=$('#ovSub');sub.textContent='';const line=t=>{const e=document.createElement('span');e.textContent=t;sub.appendChild(e)};
   if(short<=Math.max(2,need()*.2))line(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)line(`Your machine: ${S.sides.map((v,i)=>S.fx[i]?FXD[S.fx[i]].name:'d'+v).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
-function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
+function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];S.dp=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];busy=false;save();layout();const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)];sfx.buy()}
 function refreshGo(){const h=busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
   if(!h){go.classList.remove('ready');void go.offsetWidth;go.classList.add('ready');sfx.ready()}else go.classList.remove('down')}
@@ -459,7 +466,7 @@ function press(){
   if(lvlOpen||lvDelay>=0||busy)return;
   audio();
   if(score.value>=need()||(!calibrating()&&S.left<=0))return;
-  setBusy(true);S.presses++;if(calibrating())S.calib++;else{S.left--;freePips.delete(S.left)}updateGoLabel();save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;ph.dq=[];ph.mult=1;dice.forEach(d=>d.armed=false);
+  setBusy(true);S.presses++;if(calibrating())S.calib++;else{S.left--;freePips.delete(S.left)}updateGoLabel();save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;ph.dq=[];ph.mult=1;dice.forEach(d=>{d.armed=false;d.refunded=false});
   sfx.press();go.classList.remove('hit');void go.offsetWidth;go.classList.add('hit');
   if(!dice.length){
     let c=coins[0];
@@ -468,9 +475,9 @@ function press(){
     at(.05,()=>startFlip(c));
   }else{
     clearCoins();
-    // exploding dice: a max roll rolls again and adds, up to S.boom extra rolls
-    const seqs=dice.map(d=>{const q=[roll(d)];while(q.length<=S.boom&&q[q.length-1]===d.sides)q.push(roll(d));return q}),rolls=seqs.map(q=>q[q.length-1]),
-      oc=hasPart('overclock')?2:1,counts=seqs.map((q,i)=>(q.reduce((a,b)=>a+b,0)+q.filter(v=>v===dice[i].sides).length*S.sixes)*oc),n=counts.reduce((a,b)=>a+b,0);ph.n=ph.left=n;
+    // exploding dice: a max roll rolls again and adds, up to that die's explosion level
+    const seqs=dice.map(d=>{const q=[roll(d)];while(q.length<=d.p.boom&&q[q.length-1]===d.sides)q.push(roll(d));return q}),rolls=seqs.map(q=>q[q.length-1]),
+      oc=hasPart('overclock')?2:1,counts=seqs.map((q,i)=>(q.reduce((a,b)=>a+b,0)+q.filter(v=>v===dice[i].sides).length*dice[i].p.six)*oc),n=counts.reduce((a,b)=>a+b,0);ph.n=ph.left=n;
     const sum=seqs.reduce((a,q)=>a+q.reduce((x,y)=>x+y,0),0);ph.seven=hasPart('sevens')&&sum>0&&sum%7===0;ph.sum=sum;ph.reelTrig=hasPart('reels')&&new Set(rolls).size<rolls.length;
     const sl=coinSlots(n);let g=0;
     const types=drawPouch(n);
@@ -508,7 +515,7 @@ function explodeDie(d,v,k){
   bpulse(d,'boom');
   d.rolling=false;d.face=v;d.hl=1;d.j.p.x.t=d.hx;d.j.punch(22).shove(420);sfx.land(true);sfx.boom(k);world.shake(.3+.08*k);hudJ.punch(4);
   if(J){world.burst(d.hx,d.hy,5+k*2);world.popText(k>1?'BOOM ×'+k+'!':'BOOM!',d.hx,d.hy-d.size*.95,{size:Math.max(24,d.size*.62),layers:2,kick:8,ci:1,life:.85});
-    if(S.sixes)world.popText('+'+S.sixes,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
+    if(d.p.six)world.popText('+'+d.p.six,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
   if(cfg.punch)d.j.p.y.v-=650;
   at(T+.12,()=>{d.rolling=true;d.t0=T;d.lt=BOOM-.12;d.ft=0});
 }
@@ -521,10 +528,10 @@ function landDie(d,v,mine,spill,seq=[v]){
     if(J)world.popText(d.fx==='gamble'?(v===12?'×2 PRESS':'½ PRESS'):q.tag+' READY',d.hx,d.hy-d.size*1.05,{size:Math.max(16,d.size*.4),ci:4,layers:2,life:1})}
   if(seq.length>1&&J)world.popText('= '+tot,d.hx,d.hy+d.size*1.05,{size:Math.max(24,d.size*.6),layers:2,kick:7,ci:3,life:1.1});
   if(hasPart('overclock')){partJ('overclock').punch(8);if(J)world.popText('×2',d.hx-d.size*.65,d.hy+d.size*.2,{size:Math.max(18,d.size*.4),ci:1,life:.8})}
-  if(maxed&&S.sixes)bpulse(d,'sixes');if(S.minFace>1&&v<=S.minFace)bpulse(d,'loaded');
-  if(maxed&&ph.refunds<S.rebate){ph.refunds++;S.left++;freePips.add(S.left-1);freeStamp={i:S.left-1,t:tA};bpulse(d,'rebate');updateGoLabel();sfx.ping();barJ.punch(6);if(J)world.popText('FREE ROLL!',d.hx,d.hy+d.size*.9,{size:24,ci:5,layers:2,life:1})}
+  if(maxed&&d.p.six)bpulse(d,'sixes');if(d.p.min>1&&v<=d.p.min)bpulse(d,'loaded');
+  if(maxed&&d.p.reb&&!d.refunded){d.refunded=true;ph.refunds++;S.left++;freePips.add(S.left-1);freeStamp={i:S.left-1,t:tA};bpulse(d,'rebate');updateGoLabel();sfx.ping();barJ.punch(6);if(J)world.popText('FREE ROLL!',d.hx,d.hy+d.size*.9,{size:24,ci:5,layers:2,life:1})}
   if(J){world.popText(String(v),d.hx+d.size*.55,d.hy-d.size*.55,{size:Math.max(22,d.size*.55),rise:14,ci:i8()});
-    if(v===d.sides&&S.sixes&&seq.length===1)world.popText('+'+S.sixes,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
+    if(v===d.sides&&d.p.six&&seq.length===1)world.popText('+'+d.p.six,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
   mine.forEach((c,k)=>at(T+.08+k*spill,()=>{spawnCoin(c);if(k%2===0)sfx.spill(k)}));
 }
 // paylines: full rows (3+), full columns and the two diagonals of the complete part of the grid
@@ -748,12 +755,12 @@ function pick(p,swapIdx){
   const mid=(coinTop+playBot)/2;
   if(p.coin){S.pouch.push(p.coin);bag=[];pouchBump()}
   else if(p.die){
-    if(swapIdx!==undefined){const d=dice[swapIdx];S.sides[swapIdx]=p.die;S.fx[swapIdx]=p.fxd||'';d.fx=p.fxd||'';d.sides=p.die;d.face=p.die;d.j.pop();d.hl=1;sfx.land(true)}
-    else{S.dice++;S.sides.push(p.die);S.fx.push(p.fxd||'');addDie(true,p.die,p.fxd||'');layout();if(S.dice===1)clearCoins()}
+    if(swapIdx!==undefined){const d=dice[swapIdx];S.sides[swapIdx]=p.die;d.p=S.dp[swapIdx]=newPerks();S.fx[swapIdx]=p.fxd||'';d.fx=p.fxd||'';d.sides=p.die;d.face=p.die;d.j.pop();d.hl=1;sfx.land(true)}
+    else{S.dice++;S.sides.push(p.die);S.fx.push(p.fxd||'');const np=newPerks();S.dp.push(np);addDie(true,p.die,p.fxd||'',np);layout();if(S.dice===1)clearCoins()}
   }else if(p.part){if(swapIdx!==undefined)S.parts[swapIdx]=p.part;else S.parts.push(p.part);S.left=budget();partJ(p.part).pop()
-  }else({boom:()=>{S.boom++},val:()=>{S.val++},luck:()=>{S.luck++},reflip:()=>{S.reflip++},slots:()=>{S.slots++;layout()},rebate:()=>{S.rebate++},lines:()=>{S.lineMult++},
+  }else({boom:()=>{dice.forEach(d=>{d.p.boom=Math.min(3,d.p.boom+1)})},val:()=>{S.val++},luck:()=>{S.luck++},reflip:()=>{S.reflip++},slots:()=>{S.slots++;layout()},rebate:()=>{dice.forEach(d=>{d.p.reb=1})},lines:()=>{S.lineMult++},
     poly:()=>{const m=Math.min(...S.sides.filter((v,k)=>!S.fx[k])),i=S.sides.findIndex((v,k)=>v===m&&!S.fx[k]),nx=SIDES[SIDES.indexOf(m)+1];S.sides[i]=nx;dice[i].sides=nx;dice[i].face=nx;dice[i].j.pop();dice[i].hl=1},
-    loaded:()=>{S.minFace++},perf:()=>{S.perf++},sixes:()=>{S.sixes+=2},chain:()=>{S.chain++}})[p.id]();
+    loaded:()=>{dice.forEach(d=>{d.p.min=Math.min(4,d.p.min+1)})},perf:()=>{S.perf++},sixes:()=>{dice.forEach(d=>{d.p.six=Math.min(8,d.p.six+2)})},chain:()=>{S.chain++}})[p.id]();
   coins.forEach(c=>{c.j.punch(8);c.hl=1});dice.forEach(d=>{d.j.punch(8);d.hl=1});
   if(J){world.popText(p.name.toUpperCase()+'!',W/2,mid,{size:Math.min(44,W/10),layers:2,kick:6,life:1.3});world.shake(.3)}
   if(wasCalib)setTimeout(()=>{sfx.ping();if(J)world.popText(`${S.budget} PRESSES PER LEVEL FROM NOW ON`,W/2,mid+56,{size:Math.min(26,W/20),layers:2,kick:6,life:2.2,ci:4})},500);
@@ -799,7 +806,7 @@ function openPouch(){const L=$('#pouchList');L.innerHTML='';
   pouchDlg.classList.add('open');setTimeout(()=>$('#pouchClose').focus(),30)}
 // ---- die info: tap a die to see what it is and everything acting on it ----
 const dieDlg=$('#dieDlg');
-function openDie(i){const d=dice[i];if(!d)return;const q=d.fx?FXD[d.fx]:null,lo=Math.min(S.minFace,d.sides),B=$('#dieBody');B.innerHTML='';
+function openDie(i){const d=dice[i];if(!d)return;const q=d.fx?FXD[d.fx]:null,P=d.p,lo=Math.min(P.min,d.sides),B=$('#dieBody');B.innerHTML='';
   const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
   const sec=t=>B.appendChild(el('h3','ptitle',t));
   const row=(ico,name,desc)=>{const r=el('div','prow slab'),tx=el('div');tx.append(el('b',null,name),el('small',null,desc));r.append(ico,tx,el('span'));B.appendChild(r)};
@@ -815,15 +822,16 @@ function openDie(i){const d=dice[i];if(!d)return;const q=d.fx?FXD[d.fx]:null,lo=
   B.appendChild(el('p','note',key.join(' · ').replace(/^./,c=>c.toUpperCase())));
   B.appendChild(el('p','note',`Each roll spills that many coins${hasPart('overclock')?' (doubled by Overclock)':''}.`));
   if(q){sec('EFFECT');row(gb(q.acc,q.glyph,'#fff'),`On ${q.faces.join(' or ')}`,q.desc.replace(/^A d\d+\. /,''))}
-  const has=S.boom||S.rebate||S.minFace>1||S.sixes||['overclock','sevens','reels'].some(hasPart);
-  sec('ON EVERY DIE');
-  if(S.boom)row(gb('#ff9f1c',S.boom>1?String(S.boom):'✸'),'Exploding dice',`A max roll rolls again and adds, up to ${S.boom} time${S.boom>1?'s':''} in a row`);
-  if(S.rebate)row(gb('#4cc9f0','↺'),'Rebate',`A max roll gives the press back, up to ${S.rebate} per press`+(busy?` (${Math.max(0,S.rebate-ph.refunds)} left this press)`:''));
-  if(S.minFace>1)row(gb('#a9b4c4','≥'+S.minFace),'Loaded dice',`Never rolls below ${S.minFace}`);
-  if(S.sixes)row(gb('#3ddc97','+'+S.sixes),'Max roll bonus',`A max roll adds ${S.sixes} bonus coins`);
+  const mine=P.boom||P.reb||P.min>1||P.six;
+  sec('UPGRADES ON THIS DIE');
+  if(P.boom)row(gb('#ff9f1c',P.boom>1?String(P.boom):'✸'),'Exploding dice',`A max roll rolls again and adds, up to ${P.boom} time${P.boom>1?'s':''} in a row`);
+  if(P.reb)row(gb('#4cc9f0','↺'),'Rebate','A max roll gives the press back, once per press'+(busy&&d.refunded?' (used this press)':''));
+  if(P.min>1)row(gb('#a9b4c4','≥'+P.min),'Loaded dice',`Never rolls below ${Math.min(P.min,d.sides)}`);
+  if(P.six)row(gb('#3ddc97','+'+P.six),'Max roll bonus',`A max roll adds ${P.six} bonus coins`);
+  if(!mine)B.appendChild(el('p','note','No upgrades on this die yet. Picking a die upgrade card upgrades every die you own at that moment.'));
+  if(['overclock','sevens','reels'].some(hasPart))sec('MACHINE PARTS');
   [['overclock','Spills twice the coins (1 fewer press per level)'],['sevens','If all your dice add up to a multiple of 7, the press pays ×2'],['reels','If two dice show the same number, the board spins after the flips']]
     .forEach(([id,t])=>{if(!hasPart(id))return;const c=document.createElement('canvas');partIcon(c,id,44);row(c,PARTS[id].name+' (part)',t)});
-  if(!has)B.appendChild(el('p','note','No upgrades on your dice yet. Exploding dice, Rebate, Loaded dice and more come from level-up cards.'));
   dieDlg.classList.add('open');requestAnimationFrame(fitAll);setTimeout(()=>$('#dieClose').focus(),30)}
 const closeDie=()=>dieDlg.classList.remove('open');
 $('#dieClose').addEventListener('click',closeDie);dieDlg.addEventListener('click',e=>{if(e.target===dieDlg)closeDie()});
@@ -879,7 +887,7 @@ function drawDie(d){
     ctx.fillStyle=ef?acc:top?'#ff4b3e':'#111';ctx.fillText(txt,0,d.sides===4?s*.12:s*.03)}
   ctx.restore();
   drawBadges(d,t);
-  if(!d.rolling&&d.sides!==6){ctx.font='11px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.fillStyle=th.hint;ctx.fillText('d'+d.sides,d.hx,d.hy+s*.86+4+(d.fx||S.rebate||S.boom||S.minFace>1||S.sixes?Math.max(8,s*.21)+2:0))}
+  if(!d.rolling&&d.sides!==6){ctx.font='11px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.fillStyle=th.hint;ctx.fillText('d'+d.sides,d.hx,d.hy+s*.86+4+(d.fx||d.p.reb||d.p.boom||d.p.min>1||d.p.six?Math.max(8,s*.21)+2:0))}
 }
 function glyph(g,type,r,dir){
   g.fillStyle='#111';g.strokeStyle='#111';g.textAlign='center';g.textBaseline='middle';
@@ -941,16 +949,15 @@ function drawZones(){zones.forEach((z,i)=>{const x=z.x-z.w/2,y=z.y-z.h/2+z.h*.04
 // perk badges on every die: a row of little stickers under it, one per die-changing perk; they pulse when the perk fires
 const bpulse=(d,k)=>{(d.bp||(d.bp={}))[k]=1};
 function drawBadges(d,t){
-  const list=[];if(d.fx)list.push('fx');if(S.rebate)list.push('rebate');if(S.boom)list.push('boom');if(S.minFace>1)list.push('loaded');if(S.sixes)list.push('sixes');if(!list.length||t.s<.05)return;
+  const list=[];if(d.fx)list.push('fx');if(d.p.reb)list.push('rebate');if(d.p.boom)list.push('boom');if(d.p.min>1)list.push('loaded');if(d.p.six)list.push('sixes');if(!list.length||t.s<.05)return;
   const s=d.size,R=Math.max(8,s*.21);
   const room=(zones.length>1?zones[1].x-zones[0].x:s*1.5)-6,step=list.length>1?Math.min(R*2+3,(room-R*2)/(list.length-1)):0;
   // too many perks for the space under a die: badges overlap like a stack of chips
   list.forEach((k,i)=>{const p=(d.bp&&d.bp[k])||0,sc=t.s*(1+.6*p*p),x=t.x+(i-(list.length-1)/2)*step,y=t.y+s*.66;
-    ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);ctx.lineWidth=Math.max(2,R*.24);ctx.strokeStyle=th.line;ctx.lineJoin='round';
+    ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);if(k==='rebate'&&busy&&d.refunded)ctx.globalAlpha=.4;ctx.lineWidth=Math.max(2,R*.24);ctx.strokeStyle=th.line;ctx.lineJoin='round';
     if(k==='boom'){ctx.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8-Math.PI/2,q=i%2?R*.7:R*1.15;ctx.lineTo(Math.cos(a)*q,Math.sin(a)*q)}ctx.closePath();ctx.fillStyle='#ff9f1c';ctx.fill();ctx.stroke()}
-    else{ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fillStyle=k==='fx'?FXD[d.fx].acc:k==='rebate'?'#4cc9f0':k==='loaded'?'#a9b4c4':'#3ddc97';ctx.fill();ctx.stroke();
-      if(k==='rebate'&&S.rebate>1){const rem=busy?S.rebate-ph.refunds:S.rebate;for(let j=0;j<S.rebate;j++){const a=-Math.PI/2+(j-(S.rebate-1)/2)*.62;ctx.beginPath();ctx.arc(Math.cos(a)*(R+3),Math.sin(a)*(R+3),Math.max(2,R*.24),0,7);ctx.fillStyle=j<rem?'#4cc9f0':th.tray;ctx.fill();ctx.lineWidth=1.5;ctx.stroke()}}}
-    const txt=k==='fx'?FXD[d.fx].glyph:k==='rebate'?'↺':k==='boom'?(S.boom>1?String(S.boom):''):k==='loaded'?'≥'+S.minFace:'+'+S.sixes;
+    else{ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fillStyle=k==='fx'?FXD[d.fx].acc:k==='rebate'?'#4cc9f0':k==='loaded'?'#a9b4c4':'#3ddc97';ctx.fill();ctx.stroke();}
+    const txt=k==='fx'?FXD[d.fx].glyph:k==='rebate'?'↺':k==='boom'?(d.p.boom>1?String(d.p.boom):''):k==='loaded'?'≥'+d.p.min:'+'+d.p.six;
     if(txt){ctx.fillStyle=k==='fx'?'#fff':'#111';ctx.font=`${Math.round(R*(txt.length>1?.95:1.15))}px "Archivo Black", sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,R*.06)}
     ctx.restore()});
 }
@@ -1074,7 +1081,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126050255';let updShown=false,updDismissed='';
+const BUILD='20261126050640';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1115,7 +1122,7 @@ $('#tSkin').addEventListener('click',()=>{skin=skin==='dark'?'light':'dark';appl
 applySkin();
 let resetArm=-1e9;
 $('#tReset').addEventListener('click',e=>{const b=e.currentTarget;if(performance.now()-resetArm>2500){resetArm=performance.now();b.textContent='Tap again to reset';return}
-  b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
+  b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];S.dp=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   lvlOpen=false;lvDelay=-1;lvlEl.classList.remove('open');over=false;overDelay=-1;$('#over').classList.remove('open');
   S.sides=[];dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];setBusy(false);save();layout();
   const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)]});
