@@ -162,7 +162,7 @@ button{font:inherit;color:var(--ink)}
 <button id="pouchBtn" class="slab" aria-haspopup="dialog">Pouch</button>
 <div id="pouchDlg" role="dialog" aria-modal="true" aria-labelledby="pouchTitle"><div id="pouchBox" class="slab">
   <div class="head"><h2 id="pouchTitle">POUCH</h2><button id="pouchClose" class="slab" aria-label="Close pouch">×</button></div>
-  <p class="note">Your dice decide how many coins flip. Every special coin you own plays in every press, at a random spot, as long as the dice give enough coins (if not, a random handful play). Plain coins fill the rest.</p>
+  <p class="note">Your dice decide how many coins flip. Every special coin you own joins every play, at a random spot, as long as the dice give enough coins (if not, a random handful join). Plain coins fill the rest.</p>
   <div id="pouchList" style="display:grid;gap:10px"></div>
 </div></div>
 <div id="dieDlg" role="dialog" aria-modal="true" aria-labelledby="dieTitle"><div id="dieBox" class="slab">
@@ -172,7 +172,7 @@ button{font:inherit;color:var(--ink)}
 <div id="menu" role="dialog" aria-modal="true" aria-labelledby="logo"><div id="menuBox">
   <img id="menuIco" src="icon-192.png" alt="">
   <h1 id="logo">ODDS<span>ENGINE</span></h1>
-  <p class="tag">One press. A lot happens.</p>
+  <p class="tag">One play. A lot happens.</p>
   <button id="mPlay" class="slab bright mbtn">PLAY</button>
   <button id="mNew" class="slab mbtn sec" hidden>NEW RUN</button>
   <button id="mInstall" class="slab mbtn sec">INSTALL APP<small id="mInstSub"></small></button>
@@ -196,11 +196,11 @@ button{font:inherit;color:var(--ink)}
 </div>
 <div id="over" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
   <div id="ovBox">
-    <h2 id="ovTitle">OUT OF PRESSES</h2>
+    <h2 id="ovTitle">OUT OF PLAYS</h2>
     <p class="sub" id="ovSub">The machine stopped at level 1</p>
     <div class="stats">
       <div class="stat slab"><b id="stLv">1</b><span>Level reached</span></div>
-      <div class="stat slab"><b id="stBest">0</b><span>Best press</span></div>
+      <div class="stat slab"><b id="stBest">0</b><span>Best play</span></div>
       <div class="stat slab"><b id="stRecord">1</b><span>Best level ever</span></div>
     </div>
     <button id="again" class="slab bright">NEW RUN</button>
@@ -357,11 +357,11 @@ const FXORDER={mirror:-1,magnet:0,ember:1,crown:2};
 const MDIRS=[[0,-1],[0,1],[-1,0],[1,0]];
 // ---- machine parts: rule-changers, a few slots, swapped like dice when full ----
 const PARTS={
-  cascade:{name:'Cascade',r:2,col:'#00b7f0',desc:'When a line pays, its coins drop away and fresh coins fall in and flip (up to 3 times a press)'},
-  sevens:{name:'Lucky sevens',r:1,col:'#ff0d7e',desc:'If your dice add up to a multiple of 7, the whole press pays ×2'},
-  overclock:{name:'Overclock',r:1,col:'#ff1100',desc:'Dice spill twice the coins, but you get 1 fewer press per level'},
+  cascade:{name:'Cascade',r:2,col:'#00b7f0',desc:'When a line pays, its coins drop away and fresh coins fall in and flip (up to 3 times a play)'},
+  sevens:{name:'Lucky sevens',r:1,col:'#ff0d7e',desc:'If your dice add up to a multiple of 7, the whole play pays ×2'},
+  overclock:{name:'Overclock',r:1,col:'#ff1100',desc:'Dice spill twice the coins, but you get 1 fewer play per level'},
   reels:{name:'Slot reels',r:2,col:'#ffd400',desc:'When two dice match, the board spins like a slot machine after the flips, column by column, and any new lines pay'},
-  echo:{name:'Echo chamber',r:1,col:'#9f5eff',desc:'The first line every press pays double'},
+  echo:{name:'Echo chamber',r:1,col:'#9f5eff',desc:'The first line every play pays double'},
   net:{name:'Safety net',r:0,col:'#00dc7d',desc:'Tails in the bottom row flip once more'}};
 const PSLOTS=3;
 // ---- effect dice: special dice whose marked faces trigger an effect once every coin has settled ----
@@ -370,7 +370,7 @@ const FXD={
   spin:{name:'Spinner die',sides:8,faces:[7,8],col:'#ffe884',acc:'#a86f00',r:2,glyph:'7',tag:'SPIN',desc:'A d8. On 7 or 8, once everything settles, the board spins like slot reels'},
   wild:{name:'Wild die',sides:4,faces:[3,4],col:'#acf7d3',acc:'#009e5b',r:1,glyph:'W',tag:'WILD',desc:'A d4. On 3 or 4, once everything settles, a tails turns wild (heads for lines)'},
   midas:{name:'Midas die',sides:10,faces:[9,10],col:'#ffc984',acc:'#c25a00',r:1,glyph:'×5',tag:'MIDAS',desc:'A d10. On 9 or 10, once everything settles, a tails turns golden (heads, pays ×5)'},
-  gamble:{name:'Gamble die',sides:12,faces:[1,12],col:'#ffabcc',acc:'#c40046',r:1,glyph:'±',tag:'GAMBLE',desc:'A d12. Roll 12 and the whole press pays double; roll 1 and it pays half'}};
+  gamble:{name:'Gamble die',sides:12,faces:[1,12],col:'#ffabcc',acc:'#c40046',r:1,glyph:'±',tag:'GAMBLE',desc:'A d12. Roll 12 and the whole play pays double; roll 1 and it pays half'}};
 const fxFace=d=>!!(d.fx&&!d.rolling&&FXD[d.fx].faces.includes(d.face));
 const countOf=t=>S.pouch.filter(x=>x===t).length;
 // plain coins are unlimited; the pouch holds only special coins, and every one of them is played each press
@@ -407,14 +407,14 @@ const POOL=[
     desc:()=>!S.dice?`Its roll (1–${n}) decides how many coins flip`:dice.length>=S.slots?`Slots full: swap it in for one of your dice`:`Adds a d${n} to the machine (slot ${dice.length+1} of ${S.slots})`})),
   {id:'lines',r:1,max:3,dice:1,name:'Paylines',lvl:()=>S.lineMult-3,desc:()=>`Lines of heads (any row, column or diagonal) pay ×${S.lineMult+1} instead of ×${S.lineMult}`},
   {id:'slots',r:2,max:3,dice:1,name:'Bigger table',lvl:()=>S.slots-5,ok:()=>dice.length>=S.slots-1,desc:()=>`Randomizer slots ${S.slots} → ${S.slots+1}`},
-  {id:'rebate',r:1,max:1,dice:1,name:'Rebate',lvl:()=>dlv('reb'),desc:()=>'Your dice: a max roll gives the press back (once per die per press). Dice added later start without it'},
+  {id:'rebate',r:1,max:1,dice:1,name:'Rebate',lvl:()=>dlv('reb'),desc:()=>'Your dice: a max roll gives the play back (once per die per play). Dice added later start without it'},
   {id:'val',r:0,max:99,name:'Heavier coins',lvl:()=>S.val-1,desc:()=>`Heads pays ${fmt(S.val+1)} instead of ${fmt(S.val)}`},
   {id:'luck',r:0,max:5,name:'Lucky coins',lvl:()=>S.luck,desc:()=>`Heads chance ${pct()}% → ${pct()+5}%`},
   {id:'poly',r:0,max:99,dice:1,name:'Polyhedral',lvl:()=>S.sides.reduce((a,v)=>a+SIDES.indexOf(v)-1,0),ok:()=>S.sides.some((v,i)=>v<20&&!S.fx[i]),desc:()=>{const m=Math.min(...S.sides.filter((v,i)=>!S.fx[i]));return`Your smallest die, a d${m}, becomes a d${SIDES[SIDES.indexOf(m)+1]}`}},
-  {id:'reflip',r:1,max:3,name:'Second chance',lvl:()=>S.reflip,desc:()=>S.reflip?`${S.reflip+1} tails every press get flipped again`:'One tails every press gets flipped again'},
+  {id:'reflip',r:1,max:3,name:'Second chance',lvl:()=>S.reflip,desc:()=>S.reflip?`${S.reflip+1} tails every play get flipped again`:'One tails every play gets flipped again'},
   {id:'loaded',r:1,max:3,dice:1,name:'Loaded dice',lvl:()=>dlv('min')-1,desc:()=>'Your dice: their lowest possible roll goes up by 1. Dice added later start without it'},
-  ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1],['mirror',1,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Goes in your pouch and plays every press'})),
-  {id:'perf',r:1,max:4,dice:1,name:'Perfectionist',lvl:()=>S.perf-2,desc:()=>`If every coin lands heads, the whole press pays ×${S.perf+1} (was ×${S.perf})`},
+  ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1],['mirror',1,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Goes in your pouch and joins every play'})),
+  {id:'perf',r:1,max:4,dice:1,name:'Perfectionist',lvl:()=>S.perf-2,desc:()=>`If every coin lands heads, the whole play pays ×${S.perf+1} (was ×${S.perf})`},
   {id:'sixes',r:1,max:4,dice:1,name:'Max roll bonus',lvl:()=>dlv('six')/2,desc:()=>'Your dice: a max roll (6 on a d6, 20 on a d20) adds 2 more bonus coins. Dice added later start without it'},
   {id:'boom',r:1,max:3,dice:1,name:'Exploding dice',lvl:()=>dlv('boom'),desc:()=>'Your dice: a max roll explodes one more time in a row (rolls again and adds). Dice added later start without it'},
   ...Object.entries(PARTS).map(([id,q])=>({id:'p_'+id,part:id,r:q.r,w:.6,max:1,dice:1,name:q.name,lvl:()=>hasPart(id)?1:0,desc:()=>q.desc+(S.parts.length>=PSLOTS?'. Parts full: swap one out':'')})),
@@ -525,7 +525,7 @@ function fitText(el,max,min=12){el.style.fontSize=max+'px';let f=max;while(el.sc
 function fitAll(){document.querySelectorAll('#over .stat b').forEach(e=>fitText(e,30,14));document.querySelectorAll('.card b,.prow b').forEach(e=>{e.classList.add('fit');fitText(e,parseFloat(getComputedStyle(e).fontSize)>19?19:19,12)})}
 addEventListener('resize',()=>{if(over||lvlOpen)fitAll()});
 function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}$('#stLv').textContent=S.lv;$('#stBest').textContent='+'+fmt(S.best);$('#stRecord').textContent=bestLv;
-  const short=need()-score.value;$('#ovTitle').textContent=short<=Math.max(2,need()*.2)?'SO CLOSE!':'OUT OF PRESSES';
+  const short=need()-score.value;$('#ovTitle').textContent=short<=Math.max(2,need()*.2)?'SO CLOSE!':'OUT OF PLAYS';
   const sub=$('#ovSub');sub.textContent='';const line=t=>{const e=document.createElement('span');e.textContent=t;sub.appendChild(e)};
   if(short<=Math.max(2,need()*.2))line(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)line(`Your machine: ${S.sides.map((v,i)=>S.fx[i]?FXD[S.fx[i]].name:'d'+v).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
@@ -596,12 +596,12 @@ function landDie(d,v,mine,spill,seq=[v]){
   sfx.land(v===d.sides);world.shake(v===d.sides?.22:.13);
   if(fxFace(d)){const q=FXD[d.fx];d.armed=true;bpulse(d,'fx');sfx.ping();
     if(d.fx==='gamble')ph.mult*=v===12?2:.5;else ph.dq.push(d);
-    if(J)world.popText(d.fx==='gamble'?(v===12?'×2 PRESS':'½ PRESS'):q.tag+' READY',d.hx,d.hy-d.size*1.05,{size:Math.max(16,d.size*.4),ci:4,layers:2,life:1})}
+    if(J)world.popText(d.fx==='gamble'?(v===12?'×2 PLAY':'½ PLAY'):q.tag+' READY',d.hx,d.hy-d.size*1.05,{size:Math.max(16,d.size*.4),ci:4,layers:2,life:1})}
   if(seq.length>1&&J)world.popText('= '+tot,d.hx,d.hy+d.size*1.05,{size:Math.max(24,d.size*.6),layers:2,kick:7,ci:3,life:1.1});
   if(hasPart('overclock')){partJ('overclock').punch(8);if(J)world.popText('×2',d.hx-d.size*.65,d.hy+d.size*.2,{size:Math.max(18,d.size*.4),ci:1,life:.8})}
   if(maxed&&d.p.six)bpulse(d,'sixes');if(d.p.min>1&&v<=d.p.min)bpulse(d,'loaded');
   // free presses cap at MAXPRESS in total; a refund past that is ignored, with a pop-up saying so
-  if(maxed&&d.p.reb&&!d.refunded&&S.left>=MAXPRESS){bpulse(d,'rebate');if(J)world.popText('PRESSES FULL',d.hx,d.hy+d.size*.9,{size:18,ci:6,life:.9})}
+  if(maxed&&d.p.reb&&!d.refunded&&S.left>=MAXPRESS){bpulse(d,'rebate');if(J)world.popText('PLAYS FULL',d.hx,d.hy+d.size*.9,{size:18,ci:6,life:.9})}
   else if(maxed&&d.p.reb&&!d.refunded){d.refunded=true;ph.refunds++;S.left++;freePips.add(S.left-1);freeStamp={i:S.left-1,t:tA};bpulse(d,'rebate');updateGoLabel();sfx.ping();barJ.punch(6);if(J)world.popText('FREE ROLL!',d.hx,d.hy+d.size*.9,{size:24,ci:5,layers:2,life:1})}
   if(J){world.popText(String(v),d.hx+d.size*.55,d.hy-d.size*.55,{size:Math.max(22,d.size*.55),rise:14,ci:i8()});
     if(v===d.sides&&d.p.six&&seq.length===1)world.popText('+'+d.p.six,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
@@ -836,7 +836,7 @@ function pick(p,swapIdx){
     loaded:()=>{dice.forEach(d=>{d.p.min=Math.min(4,d.p.min+1)})},perf:()=>{S.perf++},sixes:()=>{dice.forEach(d=>{d.p.six=Math.min(8,d.p.six+2)})},chain:()=>{S.chain++}})[p.id]();
   coins.forEach(c=>{c.j.punch(8);c.hl=1});dice.forEach(d=>{d.j.punch(8);d.hl=1});
   if(J){world.popText(p.name.toUpperCase()+'!',W/2,mid,{size:Math.min(44,W/10),layers:2,kick:6,life:1.3});world.shake(.3)}
-  if(wasCalib)setTimeout(()=>{sfx.ping();if(J)world.popText(`${S.budget} PRESSES PER LEVEL FROM NOW ON`,W/2,mid+56,{size:Math.min(26,W/20),layers:2,kick:6,life:2.2,ci:4})},500);
+  if(wasCalib)setTimeout(()=>{sfx.ping();if(J)world.popText(`${S.budget} PLAYS PER LEVEL FROM NOW ON`,W/2,mid+56,{size:Math.min(26,W/20),layers:2,kick:6,life:2.2,ci:4})},500);
   updateGoLabel();save();
 }
 // slots full: choose which die the new one replaces
@@ -901,12 +901,12 @@ function openDie(i){const d=dice[i];if(!d)return;const q=d.fx?FXD[d.fx]:null,P=d
   const mine=P.boom||P.reb||P.min>1||P.six;
   sec('UPGRADES ON THIS DIE');
   if(P.boom)row(gb('#ff9300',P.boom>1?String(P.boom):'✸'),'Exploding dice',`A max roll rolls again and adds, up to ${P.boom} time${P.boom>1?'s':''} in a row`);
-  if(P.reb)row(gb('#00b7f0','↺'),'Rebate','A max roll gives the press back, once per press'+(busy&&d.refunded?' (used this press)':''));
+  if(P.reb)row(gb('#00b7f0','↺'),'Rebate','A max roll gives the play back, once per play'+(busy&&d.refunded?' (used this play)':''));
   if(P.min>1)row(gb('#89a1c4','≥'+P.min),'Loaded dice',`Never rolls below ${Math.min(P.min,d.sides)}`);
   if(P.six)row(gb('#00dc7d','+'+P.six),'Max roll bonus',`A max roll adds ${P.six} bonus coins`);
   if(!mine)B.appendChild(el('p','note','No upgrades on this die yet. Picking a die upgrade card upgrades every die you own at that moment.'));
   if(['overclock','sevens','reels'].some(hasPart))sec('MACHINE PARTS');
-  [['overclock','Spills twice the coins (1 fewer press per level)'],['sevens','If all your dice add up to a multiple of 7, the press pays ×2'],['reels','If two dice show the same number, the board spins after the flips']]
+  [['overclock','Spills twice the coins (1 fewer play per level)'],['sevens','If all your dice add up to a multiple of 7, the play pays ×2'],['reels','If two dice show the same number, the board spins after the flips']]
     .forEach(([id,t])=>{if(!hasPart(id))return;const c=document.createElement('canvas');partIcon(c,id,44);row(c,PARTS[id].name+' (part)',t)});
   dieDlg.classList.add('open');requestAnimationFrame(fitAll);setTimeout(()=>$('#dieClose').focus(),30)}
 function openMachine(){const B=$('#dieBody');B.innerHTML='';
@@ -1080,10 +1080,10 @@ const STATS=[
   {k:'chain',col:'#ff9300',on:()=>S.chain>0,txt:()=>'+'+(busy&&ph.streak?S.chain*ph.streak:S.chain),name:'Hot streak',
     desc:()=>`Each heads in a row pays +${S.chain} more than the last; a tails resets it`+(busy&&ph.streak?`. Streak now: ${ph.streak}, next heads +${S.chain*ph.streak}`:'')},
   {k:'reflip',col:'#a282ff',on:()=>S.reflip>0,dim:()=>busy&&ph.reflips>=S.reflip,txt:()=>'↻'+(busy?Math.max(0,S.reflip-ph.reflips):S.reflip),name:'Second chance',
-    desc:()=>`${S.reflip} tails ${S.reflip>1?'each press flip':'per press flips'} again`+(busy?` (${Math.max(0,S.reflip-ph.reflips)} left this press)`:'')},
+    desc:()=>`${S.reflip} tails ${S.reflip>1?'each play flip':'per play flips'} again`+(busy?` (${Math.max(0,S.reflip-ph.reflips)} left this play)`:'')},
   {k:'luck',col:'#00dc7d',on:()=>S.luck>0,txt:()=>pct()+'%',name:'Lucky coins',desc:()=>`Coins land heads ${pct()}% of the time (base 55%)`},
   {k:'lines',col:'#ff0d7e',on:()=>S.lineMult>3,txt:()=>'×'+S.lineMult,name:'Paylines',desc:()=>`A straight line of 3+ heads pays ×${S.lineMult} (base ×3)`},
-  {k:'perf',col:'#ffd400',on:()=>S.perf>2,txt:()=>'★'+S.perf,name:'Perfectionist',desc:()=>`If every coin lands heads, the whole press pays ×${S.perf} (base ×2)`}];
+  {k:'perf',col:'#ffd400',on:()=>S.perf>2,txt:()=>'★'+S.perf,name:'Perfectionist',desc:()=>`If every coin lands heads, the whole play pays ×${S.perf} (base ×2)`}];
 const SJ={};const sj=k=>SJ[k]||(SJ[k]=world.add(new Juicy(20,UI.pipY+10,{k:500,z:.35})));
 const statHit=k=>{sj(k).punch(14).wobble(.4)};
 let statHits=[];
@@ -1228,7 +1228,7 @@ function frame(now){
     if(J){world.popText('LEVEL UP!',W/2,(coinTop+playBot)/2,{size:Math.min(68,W/6.5),layers:3,kick:10,life:.9});world.shake(.55)}
   }
   if(!lvlOpen&&lvDelay<0&&!over&&overDelay<0&&!busy&&!calibrating()&&S.left<=0&&!world.coins.some(c=>c.fly)&&score.value<need()){
-    overDelay=.6;sfx.over();if(J){world.popText('OUT OF PRESSES',W/2,(coinTop+playBot)/2,{size:Math.min(46,W/9),layers:3,kick:8,life:1});world.shake(.5)}}
+    overDelay=.6;sfx.over();if(J){world.popText('OUT OF PLAYS',W/2,(coinTop+playBot)/2,{size:Math.min(46,W/9),layers:3,kick:8,life:1});world.shake(.5)}}
   if(overDelay>=0){overDelay-=raw;if(overDelay<0)openOver()}
   if(lvDelay>=0){lvDelay-=raw;if(lvDelay<0)openLevel()}
   refreshGo();
@@ -1353,7 +1353,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126172151';let updShown=false,updDismissed='';
+const BUILD='20261126172406';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
