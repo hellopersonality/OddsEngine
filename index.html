@@ -444,7 +444,7 @@ function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setIt
   const sub=$('#ovSub');sub.textContent='';const line=t=>{const e=document.createElement('span');e.textContent=t;sub.appendChild(e)};
   if(short<=Math.max(2,need()*.2))line(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)line(`Your machine: ${S.sides.map((v,i)=>S.fx[i]?FXD[S.fx[i]].name:'d'+v).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
-function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
+function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];busy=false;save();layout();const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)];sfx.buy()}
 function refreshGo(){const h=busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
   if(!h){go.classList.remove('ready');void go.offsetWidth;go.classList.add('ready');sfx.ready()}else go.classList.remove('down')}
@@ -452,7 +452,7 @@ function press(){
   if(lvlOpen||lvDelay>=0||busy)return;
   audio();
   if(score.value>=need()||(!calibrating()&&S.left<=0))return;
-  setBusy(true);S.presses++;if(calibrating())S.calib++;else S.left--;updateGoLabel();save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;ph.dq=[];ph.mult=1;dice.forEach(d=>d.armed=false);
+  setBusy(true);S.presses++;if(calibrating())S.calib++;else{S.left--;freePips.delete(S.left)}updateGoLabel();save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;ph.dq=[];ph.mult=1;dice.forEach(d=>d.armed=false);
   sfx.press();go.classList.remove('hit');void go.offsetWidth;go.classList.add('hit');
   if(!dice.length){
     let c=coins[0];
@@ -515,7 +515,7 @@ function landDie(d,v,mine,spill,seq=[v]){
   if(seq.length>1&&J)world.popText('= '+tot,d.hx,d.hy+d.size*1.05,{size:Math.max(24,d.size*.6),layers:2,kick:7,ci:3,life:1.1});
   if(hasPart('overclock')){partJ('overclock').punch(8);if(J)world.popText('×2',d.hx-d.size*.65,d.hy+d.size*.2,{size:Math.max(18,d.size*.4),ci:1,life:.8})}
   if(maxed&&S.sixes)bpulse(d,'sixes');if(S.minFace>1&&v<=S.minFace)bpulse(d,'loaded');
-  if(maxed&&ph.refunds<S.rebate){ph.refunds++;S.left++;updateGoLabel();sfx.ping();if(J)world.popText('PRESS BACK!',d.hx,d.hy+d.size*.9,{size:24,ci:4,layers:2,life:1})}
+  if(maxed&&ph.refunds<S.rebate){ph.refunds++;S.left++;freePips.add(S.left-1);freeStamp={i:S.left-1,t:tA};bpulse(d,'rebate');updateGoLabel();sfx.ping();barJ.punch(6);if(J)world.popText('FREE ROLL!',d.hx,d.hy+d.size*.9,{size:24,ci:5,layers:2,life:1})}
   if(J){world.popText(String(v),d.hx+d.size*.55,d.hy-d.size*.55,{size:Math.max(22,d.size*.55),rise:14,ci:i8()});
     if(v===d.sides&&S.sixes&&seq.length===1)world.popText('+'+S.sixes,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
   mine.forEach((c,k)=>at(T+.08+k*spill,()=>{spawnCoin(c);if(k%2===0)sfx.spill(k)}));
@@ -736,7 +736,7 @@ function pick(p,swapIdx){
   lvlOpen=false;lvlEl.classList.remove('open');sfx.buy();hideSwap();
   world.coins=[];const carry=Math.max(0,score.value-need());score.value=score.shown=carry;const wasCalib=calibrating();if(wasCalib)S.budget=BUDGET;S.lv++;S.left=budget();
   if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}
-  if(S.lv%4===0)S.rerolls++;
+  if(S.lv%4===0)S.rerolls++;freePips.clear();
   hudJ.pop();barJ.punch(12).shove(300);
   const mid=(coinTop+playBot)/2;
   if(p.coin){S.pouch.push(p.coin);bag=[];pouchBump()}
@@ -839,7 +839,7 @@ function drawDie(d){
     ctx.fillStyle=ef?acc:top?'#ff4b3e':'#111';ctx.fillText(txt,0,d.sides===4?s*.12:s*.03)}
   ctx.restore();
   drawBadges(d,t);
-  if(!d.rolling&&d.sides!==6){ctx.font='11px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.fillStyle=th.hint;ctx.fillText('d'+d.sides,d.hx,d.hy+s*.86+4+(d.fx||S.boom||S.minFace>1||S.sixes?Math.max(8,s*.21)+2:0))}
+  if(!d.rolling&&d.sides!==6){ctx.font='11px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.fillStyle=th.hint;ctx.fillText('d'+d.sides,d.hx,d.hy+s*.86+4+(d.fx||S.rebate||S.boom||S.minFace>1||S.sixes?Math.max(8,s*.21)+2:0))}
 }
 function glyph(g,type,r,dir){
   g.fillStyle='#111';g.strokeStyle='#111';g.textAlign='center';g.textBaseline='middle';
@@ -901,18 +901,19 @@ function drawZones(){zones.forEach((z,i)=>{const x=z.x-z.w/2,y=z.y-z.h/2+z.h*.04
 // perk badges on every die: a row of little stickers under it, one per die-changing perk; they pulse when the perk fires
 const bpulse=(d,k)=>{(d.bp||(d.bp={}))[k]=1};
 function drawBadges(d,t){
-  const list=[];if(d.fx)list.push('fx');if(S.boom)list.push('boom');if(S.minFace>1)list.push('loaded');if(S.sixes)list.push('sixes');if(!list.length||t.s<.05)return;
+  const list=[];if(d.fx)list.push('fx');if(S.rebate)list.push('rebate');if(S.boom)list.push('boom');if(S.minFace>1)list.push('loaded');if(S.sixes)list.push('sixes');if(!list.length||t.s<.05)return;
   const s=d.size,R=Math.max(8,s*.21);
   list.forEach((k,i)=>{const p=(d.bp&&d.bp[k])||0,sc=t.s*(1+.6*p*p),x=t.x+(i-(list.length-1)/2)*(R*2+3),y=t.y+s*.66;
     ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);ctx.lineWidth=Math.max(2,R*.24);ctx.strokeStyle=th.line;ctx.lineJoin='round';
     if(k==='boom'){ctx.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8-Math.PI/2,q=i%2?R*.7:R*1.15;ctx.lineTo(Math.cos(a)*q,Math.sin(a)*q)}ctx.closePath();ctx.fillStyle='#ff9f1c';ctx.fill();ctx.stroke()}
-    else{ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fillStyle=k==='fx'?FXD[d.fx].acc:k==='loaded'?'#a9b4c4':'#3ddc97';ctx.fill();ctx.stroke()}
-    const txt=k==='fx'?FXD[d.fx].glyph:k==='boom'?(S.boom>1?String(S.boom):''):k==='loaded'?'≥'+S.minFace:'+'+S.sixes;
+    else{ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fillStyle=k==='fx'?FXD[d.fx].acc:k==='rebate'?'#4cc9f0':k==='loaded'?'#a9b4c4':'#3ddc97';ctx.fill();ctx.stroke();
+      if(k==='rebate'&&S.rebate>1){const rem=busy?S.rebate-ph.refunds:S.rebate;for(let j=0;j<S.rebate;j++){const a=-Math.PI/2+(j-(S.rebate-1)/2)*.62;ctx.beginPath();ctx.arc(Math.cos(a)*(R+3),Math.sin(a)*(R+3),Math.max(2,R*.24),0,7);ctx.fillStyle=j<rem?'#4cc9f0':th.tray;ctx.fill();ctx.lineWidth=1.5;ctx.stroke()}}}
+    const txt=k==='fx'?FXD[d.fx].glyph:k==='rebate'?'↺':k==='boom'?(S.boom>1?String(S.boom):''):k==='loaded'?'≥'+S.minFace:'+'+S.sixes;
     if(txt){ctx.fillStyle=k==='fx'?'#fff':'#111';ctx.font=`${Math.round(R*(txt.length>1?.95:1.15))}px "Archivo Black", sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,R*.06)}
     ctx.restore()});
 }
 // ---- score heat: a press scoring well against the level's goal sets the score alight (Balatro-style) ----
-let heat=0,heatT=0,crackle=0;const flames=[];
+let heat=0,heatT=0,crackle=0,freeStamp=null;const freePips=new Set();const flames=[];
 function stepHeat(dt){
   // heat compares this press with your own recent presses: 2x your usual shows flames, 3x is ON FIRE
   if(busy&&S.avgN>=3&&S.avg>0)heatT=Math.max(heatT,(ph.tot/S.avg-1)/2);else if(!busy)heatT*=Math.exp(-dt*.9);
@@ -962,7 +963,10 @@ function drawLines(){
 function drawPips(){
   const cal=calibrating();if(cal){ctx.font='12px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=th.hint;ctx.fillText('FREE FLIPS',W/2,UI.pipY)}
   const n=cal?0:Math.max(budget(),S.left),sz=Math.round(16*Math.max(.85,UI.k)),gp=8,w=n*sz+(n-1)*gp,x0=W/2-w/2,y=UI.pipY;
-  for(let i=0;i<n;i++){const on=cal?i<S.calib:i<S.left,x=x0+i*(sz+gp);if(amb()&&!cal&&i===S.left-1&&!busy){const k=1+Math.sin(tA*4)*.12;ctx.save();ctx.translate(x+sz/2,y+sz/2);ctx.scale(k,k);ctx.translate(-x-sz/2,-y-sz/2)}else ctx.save();chunkBox(ctx,x,y,sz,sz*.82,5,4,on?(cal?'#4cc9f0':S.left===1?'#ff4b3e':'#ffe14d'):th.tray,3,on?null:th.line);ctx.restore()}
+  for(let i=0;i<n;i++){const on=cal?i<S.calib:i<S.left,x=x0+i*(sz+gp);if(amb()&&!cal&&i===S.left-1&&!busy){const k=1+Math.sin(tA*4)*.12;ctx.save();ctx.translate(x+sz/2,y+sz/2);ctx.scale(k,k);ctx.translate(-x-sz/2,-y-sz/2)}else ctx.save();chunkBox(ctx,x,y,sz,sz*.82,5,4,on?(cal||freePips.has(i)?'#4cc9f0':S.left===1?'#ff4b3e':'#ffe14d'):th.tray,3,on?null:th.line);ctx.restore()}
+  if(freeStamp&&!cal){const age=tA-freeStamp.t;if(age>1.5)freeStamp=null;else{const cx=x0+freeStamp.i*(sz+gp)+sz/2,cy=y-sz*.55,k=age<.16?2.4-age/.16*1.4:1+Math.max(0,.1-age)*0,w=sz*2.9,h=sz*1.15;
+    ctx.save();ctx.globalAlpha=age>1.2?(1.5-age)/.3:1;ctx.translate(cx,cy);ctx.rotate(-.18);ctx.scale(k,k);chunkBox(ctx,-w/2,-h/2,w,h,4,3,'#4cc9f0',2.5);
+    ctx.fillStyle='#111';ctx.font=`${Math.round(h*.68)}px "Archivo Black", sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('FREE',0,1);ctx.restore()}}
 
 }
 function draw(){
@@ -1028,7 +1032,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126044925';let updShown=false,updDismissed='';
+const BUILD='20261126045855';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1068,7 +1072,7 @@ $('#tSkin').addEventListener('click',()=>{skin=skin==='dark'?'light':'dark';appl
 applySkin();
 let resetArm=-1e9;
 $('#tReset').addEventListener('click',e=>{const b=e.currentTarget;if(performance.now()-resetArm>2500){resetArm=performance.now();b.textContent='Tap again to reset';return}
-  b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
+  b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   lvlOpen=false;lvDelay=-1;lvlEl.classList.remove('open');over=false;overDelay=-1;$('#over').classList.remove('open');
   S.sides=[];dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];setBusy(false);save();layout();
   const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)]});
