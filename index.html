@@ -569,7 +569,7 @@ function payLine(l){
   if(hasPart('echo')&&!ph.echoed&&bonus>0){ph.echoed=true;bonus*=2;at(T+.2,()=>partHit('echo','ECHO ×2'))}
   const a=l.cs[0],b=l.cs[l.cs.length-1],mx=(a.tx+b.tx)/2,my=(a.ty+b.ty)/2;
   ph.tot+=bonus;payout(mx,my,bonus,Math.min(10,Math.max(3,bonus)));sfx.line(ph.paid.length);
-  l.cs.forEach(o=>{o.hl=1;o.j.punch(9)});hudJ.punch(10);
+  l.cs.forEach(o=>{o.hl=1;o.j.punch(9)});hudJ.punch(10);if(S.lineMult>3)statHit('lines');
   if(J){world.popText('LINE ×'+S.lineMult,mx,my,{size:Math.min(52,W/8),layers:2,kick:8,life:1.2,ci:ph.paid.length*3});world.shake(.3)}
   // cascade: queued, not run now. Anything that changes the board waits until every coin on screen has resolved (see endPress)
   const fresh=l.cs.filter(o=>!o.pc);
@@ -586,12 +586,12 @@ function resolveCoin(c){
   c.flipping=false;c.face=c.res;c.pc=false;c.j.punch(10).wobble(.25);
   const k=ph.n>24?1:ph.n>8?2:3;
   if(c.res==='h'){
-    const gold=c.type==='gold';let v=c.copyVal!=null?c.copyVal:c.type==='lead'?1:c.type==='wild'?0:(S.val+S.chain*ph.streak)*(gold?5:1);ph.streak++;c.val=v;c.final=true;
+    const gold=c.type==='gold';let v=c.copyVal!=null?c.copyVal:c.type==='lead'?1:c.type==='wild'?0:(S.val+S.chain*ph.streak)*(gold?5:1);ph.streak++;if(S.chain&&ph.streak>1)statHit('chain');c.val=v;c.final=true;
     ph.tot+=v;ph.heads++;barJ.punch(2);c.hl=1;payout(c.tx,c.ty,v,gold?k+3:k);
     sfx.heads(ph.heads-1);if(gold)sfx.gold();
     if(J){if(c.type==='wild'||v===0)world.popText(c.type==='mirror'?'COPY':'WILD',c.tx,c.ty-c.r*.9,{size:Math.max(16,Math.min(30,c.r*.55)),ci:4,life:.7});else world.popText('+'+fmt(v),c.tx,c.ty-c.r*.9,{size:Math.max(18,Math.min(gold?48:40,c.r*(gold?.95:.75))),ci:i8(),layers:gold?2:1});world.shake(gold?.12:.035)}
   }else{
-    if(ph.reflips<S.reflip&&!c.noAgain){ph.reflips++;c.res=resFor(c.type);sfx.again();
+    if(ph.reflips<S.reflip&&!c.noAgain){ph.reflips++;statHit('reflip');c.res=resFor(c.type);sfx.again();
       if(J)world.popText('AGAIN!',c.tx,c.ty-c.r*.8,{size:Math.max(18,Math.min(34,c.r*.6)),ci:5,life:.6});
       at(T+.28,()=>startFlip(c));return}
     if(hasPart('net')&&!c.noAgain&&!c.netted&&ph.botRow!=null&&c.row===ph.botRow){c.netted=true;c.res=resFor(c.type);partJ('net').punch(10).wobble(.4);sfx.again();
@@ -685,7 +685,7 @@ function endPress(){
     near.forEach(l=>{ph.miss.push({l,t:T});const o=l.cs.find(o=>o.res!=='h');o.j.shove(260);world.popText('1 OFF',o.tx,o.ty-o.r,{size:20,ci:1,life:.8})});if(near.length)sfx.miss(true)}
   if(ph.tot>0){
     const perfect=ph.n>=2&&coins.every(o=>o.final&&o.res==='h');
-    if(perfect){const bonus=ph.tot*(S.perf-1);payout(W/2,mid,bonus,Math.min(16,Math.max(6,bonus)));ph.tot+=bonus;hudJ.punch(14).shove(400);sfx.perfect();
+    if(perfect){if(S.perf>2)statHit('perf');const bonus=ph.tot*(S.perf-1);payout(W/2,mid,bonus,Math.min(16,Math.max(6,bonus)));ph.tot+=bonus;hudJ.punch(14).shove(400);sfx.perfect();
       if(J){world.popText('PERFECT ×'+S.perf,W/2,mid,{size:Math.min(64,W/7.5),layers:3,kick:9,life:1.6});world.shake(.6)}}
     else hudJ.punch(8);
     if(ph.mult!==1){const g=dice.find(d=>d.fx==='gamble'&&d.armed),delta=Math.round(ph.tot*(ph.mult-1));if(g){g.armed=false;g.j.punch(18);bpulse(g,'fx')}
@@ -833,11 +833,26 @@ function openDie(i){const d=dice[i];if(!d)return;const q=d.fx?FXD[d.fx]:null,P=d
   [['overclock','Spills twice the coins (1 fewer press per level)'],['sevens','If all your dice add up to a multiple of 7, the press pays ×2'],['reels','If two dice show the same number, the board spins after the flips']]
     .forEach(([id,t])=>{if(!hasPart(id))return;const c=document.createElement('canvas');partIcon(c,id,44);row(c,PARTS[id].name+' (part)',t)});
   dieDlg.classList.add('open');requestAnimationFrame(fitAll);setTimeout(()=>$('#dieClose').focus(),30)}
+function openMachine(){const B=$('#dieBody');B.innerHTML='';
+  const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+  const sec=t=>B.appendChild(el('h3','ptitle',t));
+  const row=(ico,name,desc,faded)=>{const r=el('div','prow slab'),tx=el('div');tx.append(el('b',null,name),el('small',null,desc));r.append(ico,tx,el('span'));if(faded)r.style.opacity=.55;B.appendChild(r)};
+  const tok=q=>{const e=el('span','gb',q.txt());e.style.background=q.col;e.style.borderRadius='10px';e.style.fontSize=q.txt().length>2?'12px':'15px';return e};
+  {const c=$('#dieIco'),g=c.getContext('2d');c.width=c.height=128;g.scale(2,2);g.translate(32,30);const P=Array.from({length:6},(_,i)=>{const a=i*Math.PI/3;return[Math.cos(a)*22,Math.sin(a)*21]});
+    chunkBase(g,P,6,'#ffe14d',3);ptsPath(g,P);g.fillStyle='#ffe14d';g.fill();g.lineWidth=3;g.strokeStyle=th.line;g.stroke();g.beginPath();g.arc(0,0,8,0,7);g.fillStyle=th.line;g.fill()}
+  $('#dieTitle').textContent='Machine';$('#dieSub').textContent='Everything that applies to the whole machine';
+  sec('MACHINE UPGRADES');STATS.forEach(q=>row(tok(q),q.name+(q.on()?'':' (base)'),q.desc(),!q.on()));
+  sec(`MACHINE PARTS ${S.parts.length}/${PSLOTS}`);
+  S.parts.forEach(id=>{const c=document.createElement('canvas');partIcon(c,id,44);row(c,PARTS[id].name,PARTS[id].desc)});
+  if(!S.parts.length)B.appendChild(el('p','note','No parts yet. Rule-changing parts come from level-up cards.'));
+  B.appendChild(el('p','note',`Heads pays the coin's value (${fmt(S.val)} for plain coins). Upgrades on single dice show as badges under them: tap a die to see them.`));
+  dieDlg.classList.add('open');requestAnimationFrame(fitAll);setTimeout(()=>$('#dieClose').focus(),30)}
+const statAt=(x,y)=>statHits.some(h=>Math.hypot(x-h.x,y-h.y)<h.r);
 const closeDie=()=>dieDlg.classList.remove('open');
 $('#dieClose').addEventListener('click',closeDie);dieDlg.addEventListener('click',e=>{if(e.target===dieDlg)closeDie()});
 const dieAt=(x,y)=>dice.findIndex(d=>Math.hypot(x-d.j.p.x.x,y-d.j.p.y.x)<d.size*.8);
-cv.addEventListener('pointerdown',e=>{if(lvlOpen||over||pouchDlg.classList.contains('open')||dieDlg.classList.contains('open'))return;const i=dieAt(e.clientX,e.clientY);if(i>=0){audio();sfx.press();dice[i].j.punch(8);openDie(i)}});
-cv.addEventListener('pointermove',e=>{cv.style.cursor=dieAt(e.clientX,e.clientY)>=0?'pointer':''});
+cv.addEventListener('pointerdown',e=>{if(lvlOpen||over||pouchDlg.classList.contains('open')||dieDlg.classList.contains('open'))return;const i=dieAt(e.clientX,e.clientY);if(i>=0){audio();sfx.press();dice[i].j.punch(8);openDie(i)}else if(statAt(e.clientX,e.clientY)){audio();sfx.press();openMachine()}});
+cv.addEventListener('pointermove',e=>{cv.style.cursor=dieAt(e.clientX,e.clientY)>=0||statAt(e.clientX,e.clientY)?'pointer':''});
 pouchBtn.addEventListener('click',openPouch);$('#pouchClose').addEventListener('click',()=>pouchDlg.classList.remove('open'));
 pouchDlg.addEventListener('click',e=>{if(e.target===pouchDlg)pouchDlg.classList.remove('open')});
 pouchBtn.textContent=pouchLabel();
@@ -941,7 +956,7 @@ const PJ={};function partJ(id){return PJ[id]||(PJ[id]=world.add(new Juicy(W-30,U
 function partHit(id,label){const j=partJ(id);j.punch(16).wobble(.5);sfx.ping();if(J&&label!==false)world.popText(label||PARTS[id].name.toUpperCase(),j.p.x.x-20,j.p.y.x+36,{size:18,ci:4,layers:2,life:1})}
 function drawParts(){const n=S.parts.length;if(!n)return;const R=Math.round(13*Math.max(.85,UI.k)),gp=R*2+8,y=UI.pipY+R*.7;
   S.parts.forEach((id,i)=>{const j=partJ(id);j.moveTo(trayX+trayW-R-8-(n-1-i)*gp,y);const s=Math.max(0,j.s.x);
-    ctx.save();ctx.translate(j.p.x.x,j.p.y.x);ctx.rotate(j.r.x);ctx.scale(s,s);drawPart(ctx,id,R,2.5);ctx.restore()})}
+    ctx.save();ctx.translate(j.p.x.x,j.p.y.x);ctx.rotate(j.r.x);ctx.scale(s,s);drawPart(ctx,id,R,2.5);ctx.restore();statHits.push({x:j.p.x.x,y:j.p.y.x,r:R+5})})}
 // sunken sockets in the tray floor, one per slot; empty ones read as room for another die
 function drawZones(){zones.forEach((z,i)=>{const x=z.x-z.w/2,y=z.y-z.h/2+z.h*.04,r=z.w*.26,empty=i>=dice.length;
   ctx.save();rr(ctx,x,y,z.w,z.h,r);ctx.fillStyle=th.zone;ctx.fill();ctx.clip();ctx.fillStyle=th.zone;ctx.fillRect(x,y,z.w,Math.max(5,z.h*.1));ctx.restore();
@@ -983,6 +998,26 @@ function drawFlames(sz){
   flames.forEach(f=>{const t=f.age/f.life,r=f.r*(1-t*.75)*(t<.15?t/.15:1),x=f.x,y=f.y;if(r<.8)return;
     ctx.fillStyle=heat>=1&&t>.7?'#ff5ca8':t<.3?'#ffe14d':t<.6?'#ff9f1c':'#ff4b3e';
     ctx.beginPath();ctx.moveTo(x,y-r*2.3);ctx.quadraticCurveTo(x+r*1.15,y-r*.7,x+r,y);ctx.arc(x,y,r,0,Math.PI);ctx.quadraticCurveTo(x-r*1.15,y-r*.7,x,y-r*2.3);ctx.closePath();ctx.fill();ctx.stroke()});
+}
+// ---- machine tokens: every machine-wide upgrade shows as a square token left of the press counter (no hidden effects) ----
+const STATS=[
+  {k:'chain',col:'#ff9f1c',on:()=>S.chain>0,txt:()=>'+'+(busy&&ph.streak?S.chain*ph.streak:S.chain),name:'Hot streak',
+    desc:()=>`Each heads in a row pays +${S.chain} more than the last; a tails resets it`+(busy&&ph.streak?`. Streak now: ${ph.streak}, next heads +${S.chain*ph.streak}`:'')},
+  {k:'reflip',col:'#c9b6ff',on:()=>S.reflip>0,dim:()=>busy&&ph.reflips>=S.reflip,txt:()=>'↻'+(busy?Math.max(0,S.reflip-ph.reflips):S.reflip),name:'Second chance',
+    desc:()=>`${S.reflip} tails ${S.reflip>1?'each press flip':'per press flips'} again`+(busy?` (${Math.max(0,S.reflip-ph.reflips)} left this press)`:'')},
+  {k:'luck',col:'#3ddc97',on:()=>S.luck>0,txt:()=>pct()+'%',name:'Lucky coins',desc:()=>`Coins land heads ${pct()}% of the time (base 55%)`},
+  {k:'lines',col:'#ff5ca8',on:()=>S.lineMult>3,txt:()=>'×'+S.lineMult,name:'Paylines',desc:()=>`A straight line of 3+ heads pays ×${S.lineMult} (base ×3)`},
+  {k:'perf',col:'#ffe14d',on:()=>S.perf>2,txt:()=>'★'+S.perf,name:'Perfectionist',desc:()=>`A press of all heads pays ×${S.perf} (base ×2)`}];
+const SJ={};const sj=k=>SJ[k]||(SJ[k]=world.add(new Juicy(20,UI.pipY+10,{k:500,z:.35})));
+const statHit=k=>{sj(k).punch(14).wobble(.4)};
+let statHits=[];
+function drawStats(){statHits=[];const L=STATS.filter(q=>q.on());if(!L.length)return;
+  const R=Math.round(13*Math.max(.85,UI.k)),y=UI.pipY+R*.7,cal=calibrating(),np=cal?0:Math.max(budget(),S.left),psz=Math.round(16*Math.max(.85,UI.k)),
+    pw=cal?90:np*psz+(np-1)*8,left=trayX+R+6,right=W/2-pw/2-R-8,step=L.length>1?Math.min(R*2+8,Math.max(R*1.1,(right-left)/(L.length-1))):0;
+  L.forEach((q,i)=>{const j=sj(q.k);j.moveTo(left+i*step,y);const sc=Math.max(0,j.s.x),t=q.txt();
+    ctx.save();ctx.translate(j.p.x.x,j.p.y.x);ctx.rotate(j.r.x);ctx.scale(sc,sc);if(q.dim&&q.dim())ctx.globalAlpha=.4;
+    chunkBox(ctx,-R,-R*.95,R*2,R*1.8,6,3,q.col,2.5);ctx.fillStyle='#111';ctx.font=`${Math.round(R*(t.length>2?.72:.9))}px "Archivo Black", sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t,0,-R*.04);
+    ctx.restore();statHits.push({x:j.p.x.x,y:j.p.y.x,r:R+5})});
 }
 function drawBar(){
   const k=UI.k,g=need(),t=barJ.xf(),chip=Math.round(58*k),bw=Math.min(300*k,W-110),bh=Math.max(26,Math.round(32*k)),x0=-bw/2+chip/2+4,p=Math.min(1,score.shown/g),step=cycleIndex(),full=score.value>=g;
@@ -1037,7 +1072,7 @@ function draw(){
   if(!S.presses){ctx.fillStyle=th.hint;ctx.font='700 14px "Space Grotesk", sans-serif';ctx.textAlign='center';ctx.fillText('tap FLIP and watch it play out',W/2,playBot-24)}
   drawZones();dice.forEach(drawDie);fading.forEach(drawCoin);coins.forEach(c=>{if(!tease||c!==tease.c)drawCoin(c)});drawLines();if(tease)drawCoin(tease.c);
   world.drawCoins(ctx);
-  drawBar();drawPips();drawParts();
+  drawBar();drawPips();drawStats();drawParts();
   {const sz=Math.min(56*UI.k,W/7),x=hudJ.p.x.x,y=hudJ.p.y.x,h=Math.min(1.6,heat),k=1+.08*h,jt=h>.45?(h-.4)*2.6:0;
     drawFlames(sz);
     if(J&&heat>.3){ctx.save();ctx.font=`${sz}px "Archivo Black", Impact, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.globalAlpha=Math.min(.8,(heat-.3)*1.4);
@@ -1081,7 +1116,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126050640';let updShown=false,updDismissed='';
+const BUILD='20261126051852';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
