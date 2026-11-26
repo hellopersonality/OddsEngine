@@ -414,7 +414,7 @@ const POOL=[
   {id:'reflip',r:1,max:3,name:'Second chance',lvl:()=>S.reflip,desc:()=>S.reflip?`${S.reflip+1} tails every press get flipped again`:'One tails every press gets flipped again'},
   {id:'loaded',r:1,max:3,dice:1,name:'Loaded dice',lvl:()=>dlv('min')-1,desc:()=>'Your dice: their lowest possible roll goes up by 1. Dice added later start without it'},
   ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1],['mirror',1,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Goes in your pouch and plays every press'})),
-  {id:'perf',r:1,max:4,dice:1,name:'Perfectionist',lvl:()=>S.perf-2,desc:()=>`All heads pays ×${S.perf+1} instead of ×${S.perf}`},
+  {id:'perf',r:1,max:4,dice:1,name:'Perfectionist',lvl:()=>S.perf-2,desc:()=>`If every coin lands heads, the whole press pays ×${S.perf+1} (was ×${S.perf})`},
   {id:'sixes',r:1,max:4,dice:1,name:'Max roll bonus',lvl:()=>dlv('six')/2,desc:()=>'Your dice: a max roll (6 on a d6, 20 on a d20) adds 2 more bonus coins. Dice added later start without it'},
   {id:'boom',r:1,max:3,dice:1,name:'Exploding dice',lvl:()=>dlv('boom'),desc:()=>'Your dice: a max roll explodes one more time in a row (rolls again and adds). Dice added later start without it'},
   ...Object.entries(PARTS).map(([id,q])=>({id:'p_'+id,part:id,r:q.r,w:.6,max:1,dice:1,name:q.name,lvl:()=>hasPart(id)?1:0,desc:()=>q.desc+(S.parts.length>=PSLOTS?'. Parts full: swap one out':'')})),
@@ -1083,7 +1083,7 @@ const STATS=[
     desc:()=>`${S.reflip} tails ${S.reflip>1?'each press flip':'per press flips'} again`+(busy?` (${Math.max(0,S.reflip-ph.reflips)} left this press)`:'')},
   {k:'luck',col:'#00dc7d',on:()=>S.luck>0,txt:()=>pct()+'%',name:'Lucky coins',desc:()=>`Coins land heads ${pct()}% of the time (base 55%)`},
   {k:'lines',col:'#ff0d7e',on:()=>S.lineMult>3,txt:()=>'×'+S.lineMult,name:'Paylines',desc:()=>`A straight line of 3+ heads pays ×${S.lineMult} (base ×3)`},
-  {k:'perf',col:'#ffd400',on:()=>S.perf>2,txt:()=>'★'+S.perf,name:'Perfectionist',desc:()=>`A press of all heads pays ×${S.perf} (base ×2)`}];
+  {k:'perf',col:'#ffd400',on:()=>S.perf>2,txt:()=>'★'+S.perf,name:'Perfectionist',desc:()=>`If every coin lands heads, the whole press pays ×${S.perf} (base ×2)`}];
 const SJ={};const sj=k=>SJ[k]||(SJ[k]=world.add(new Juicy(20,UI.pipY+10,{k:500,z:.35})));
 const statHit=k=>{sj(k).punch(14).wobble(.4)};
 let statHits=[];
@@ -1353,7 +1353,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126170016';let updShown=false,updDismissed='';
+const BUILD='20261126172151';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
