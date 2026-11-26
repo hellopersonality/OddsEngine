@@ -542,9 +542,9 @@ function payLine(l){
   ph.tot+=bonus;payout(mx,my,bonus,Math.min(10,Math.max(3,bonus)));sfx.line(ph.paid.length);
   l.cs.forEach(o=>{o.hl=1;o.j.punch(9)});hudJ.punch(10);
   if(J){world.popText('LINE ×'+S.lineMult,mx,my,{size:Math.min(52,W/8),layers:2,kick:8,life:1.2,ci:ph.paid.length*3});world.shake(.3)}
-  // cascade: the line's coins drop away and fresh plain coins fall in and flip; ph.left is reserved now so the press can't end first
+  // cascade: queued, not run now. Anything that changes the board waits until every coin on screen has resolved (see endPress)
   const fresh=l.cs.filter(o=>!o.pc);
-  if(hasPart('cascade')&&fresh.length&&(ph.casc||0)<3){ph.casc=(ph.casc||0)+1;fresh.forEach(o=>o.pc=true);ph.left+=fresh.length;at(T+.65,()=>cascadeLine(fresh))}
+  if(hasPart('cascade')&&fresh.length){fresh.forEach(o=>o.pc=true);(ph.cq||(ph.cq=[])).push(...fresh)}
 }
 function cascadeLine(fresh){
   partHit('cascade',ph.casc>1?'CASCADE ×'+ph.casc:'CASCADE');sfx.open();world.shake(.25);
@@ -633,6 +633,10 @@ function runFx(c){
 }
 function endPress(){
   if(ph.left>0){at(T+.2,endPress);return}
+  // board-changing steps run in stages, only once everything on screen has settled:
+  // flips -> coin effects -> cascade waves (every queued line at once, up to 3 waves) -> slot reels -> (their lines may cascade) -> tally
+  if(ph.cq&&ph.cq.length){const fresh=[...new Set(ph.cq)];ph.cq=[];
+    if((ph.casc||0)<3){ph.casc=(ph.casc||0)+1;ph.left+=fresh.length;at(T+.35,()=>cascadeLine(fresh));at(T+.6,endPress);return}}
   if(ph.reelTrig&&!ph.spun){ph.spun=true;spinBoard();return}
   const mid=(coinTop+playBot)/2;
   if(J&&!ph.paid.length&&!ph.teased){const near=ph.lines.filter(l=>l.cs.length>=3&&l.cs.filter(o=>o.res!=='h').length===1).slice(0,2);
@@ -960,7 +964,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126040918';let updShown=false,updDismissed='';
+const BUILD='20261126041351';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
