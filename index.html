@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Odds Engine</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#121216">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Odds Engine">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -20,8 +28,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 button{font:inherit;color:var(--ink)}
 /* chunky toy slabs: black outline, a solid side in --rim with its own outline, then a soft drop */
 .slab{--dp:6px;border:4px solid var(--line);border-radius:14px;background:var(--surf);color:var(--ink);box-shadow:0 calc(var(--dp) + 4px) 0 -4px var(--rim),0 calc(var(--dp) + 4px) 0 0 var(--line),0 calc(var(--dp) + 11px) 0 0 rgba(0,0,0,.35)}
-.tog,#pouchBtn,#pouchClose,#dieClose,#reroll,#swapBack,#updLater,.sw{--dp:4px;background:var(--btn);color:#0b0b0f;font-family:"Archivo Black",sans-serif;font-weight:400}
-#pouchBox .slab,#dieBox .slab{--rim:var(--rim0)}#go,#again,#updGo{--rim:#b89300}#go.last{--rim:#a8281e}
+.tog,#pouchBtn,#pouchClose,#dieClose,#instClose,#reroll,#swapBack,#updLater,.sw{--dp:4px;background:var(--btn);color:#0b0b0f;font-family:"Archivo Black",sans-serif;font-weight:400}
+#pouchBox .slab,#dieBox .slab,#instBox .slab{--rim:var(--rim0)}#go,#again,#updGo{--rim:#b89300}#go.last{--rim:#a8281e}
 #go:active,#go.down,.sw:active,#again:active,.card:active,.tog:active,#pouchBtn:active,#reroll:active,#swapBack:active{transform:translateY(var(--dp));box-shadow:0 4px 0 -4px var(--rim),0 4px 0 0 var(--line)}
 .bright{border-color:var(--line);color:#111}
 #ui{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;padding:8px max(14px,env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom))}
@@ -51,13 +59,24 @@ button{font:inherit;color:var(--ink)}
 :focus-visible{outline:3px dashed var(--ink);outline-offset:4px}
 #pouchBtn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));z-index:3;min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
 #pouchBtn.bump{animation:hit .3s}
-#pouchDlg,#dieDlg{position:fixed;inset:0;z-index:6;display:none;place-items:center;padding:14px;background:rgba(10,10,12,.8)}#pouchDlg.open,#dieDlg.open{display:grid}
-#pouchBox,#dieBox{width:100%;max-width:520px;max-height:90vh;overflow:auto;padding:18px;display:grid;gap:12px;--rim:var(--accent);--dp:8px}
+#pouchDlg,#dieDlg,#instDlg{position:fixed;inset:0;z-index:6;display:none;place-items:center;padding:14px;background:rgba(10,10,12,.8)}#pouchDlg.open,#dieDlg.open,#instDlg.open{display:grid}#instDlg{z-index:8}
+#pouchBox,#dieBox,#instBox{width:100%;max-width:520px;max-height:90vh;overflow:auto;padding:18px;display:grid;gap:12px;--rim:var(--accent);--dp:8px}
 #pouchBox .ptitle,#dieBox .ptitle{margin:8px 0 0;font:16px/1 "Archivo Black",sans-serif;letter-spacing:.04em}
-#pouchBox h2,#dieBox h2{margin:0;font:28px/1 "Archivo Black",sans-serif}#pouchBox .note,#dieBox .note{margin:0;color:var(--muted);font-size:14px}
+#pouchBox h2,#dieBox h2,#instBox h2{margin:0;font:28px/1 "Archivo Black",sans-serif}#pouchBox .note,#dieBox .note,#instBox .note{margin:0;color:var(--muted);font-size:14px}
 .prow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 10px}
 .prow canvas{position:static;width:44px;height:44px}.prow b{display:block;font:16px/1.15 "Archivo Black",sans-serif}.prow small{color:var(--muted);font-size:14px}
 .prow .n{font:22px/1 "Archivo Black",sans-serif}
+.mbtn{min-height:58px;padding:8px 14px;font:22px/1 "Archivo Black",sans-serif;cursor:pointer;border-radius:16px}.mbtn small{display:block;margin-top:5px;font:700 12px/1.2 "Space Grotesk",sans-serif}.mbtn.sec{background:var(--btn);color:#0b0b0f}#mPlay{background:#ffe14d;color:#111;--rim:#b89300}#instBody .mbtn{background:#ffe14d;color:#111;--rim:#b89300}
+#menu{position:fixed;inset:0;z-index:7;display:none;place-items:center;padding:20px;background:rgba(10,10,12,.8);overflow:auto}#menu.open{display:grid}
+#menuBox{width:100%;max-width:360px;display:grid;gap:14px;text-align:center}
+#menuIco{width:92px;height:92px;justify-self:center;border-radius:22px;border:4px solid var(--line);box-shadow:0 8px 0 var(--line)}
+#logo{margin:4px 0 0;font:clamp(52px,16vw,76px)/.92 "Archivo Black",sans-serif;color:#ffe14d;-webkit-text-stroke:12px #111;paint-order:stroke fill;text-shadow:0 8px 0 #111}#logo span{display:block;color:#4cc9f0}
+#menu .tag{margin:0 0 6px;font:700 15px/1.3 "Space Grotesk",sans-serif;color:var(--ink)}
+.steps{margin:0;padding:0;list-style:none;display:grid;gap:12px;counter-reset:s}
+.steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;font:600 15px/1.45 "Space Grotesk",sans-serif}
+.steps li::before{content:counter(s);width:34px;height:34px;display:grid;place-items:center;border:3px solid var(--line);border-radius:50%;background:#ffe14d;color:#111;font:16px/1 "Archivo Black",sans-serif;box-sizing:border-box}
+.ki{display:inline-flex;align-items:center;gap:4px;min-height:24px;padding:1px 7px;margin:1px 2px;border:2px solid var(--line);border-radius:7px;background:var(--btn);color:#111;font:700 13px/1.2 "Space Grotesk",sans-serif;vertical-align:middle;box-sizing:border-box}
+.perks{display:flex;flex-wrap:wrap;gap:6px}.perks span{padding:5px 10px;border:2px solid var(--line);border-radius:999px;background:var(--surf);color:var(--ink);font:700 12px/1 "Space Grotesk",sans-serif}
 .faces{display:flex;flex-wrap:wrap;gap:8px}.face{min-width:34px;height:34px;padding:0 4px;box-sizing:border-box;display:grid;place-items:center;border:3px solid var(--line);border-radius:9px;background:var(--surf);color:var(--ink);font:14px/1 "Archivo Black",sans-serif;box-shadow:0 3px 0 var(--line)}
 .face.fx{color:#fff}.face.max{outline:3px solid #ff4b3e;outline-offset:2px}.face.dead{opacity:.3}.face.cur{transform:translateY(-4px);box-shadow:0 7px 0 var(--line)}
 .gb{width:40px;height:40px;border-radius:50%;border:3px solid #111;box-sizing:border-box;display:grid;place-items:center;font:15px/1 "Archivo Black",sans-serif;color:#111;box-shadow:0 3px 0 #111}
@@ -89,7 +108,7 @@ button{font:inherit;color:var(--ink)}
 @media(max-width:560px){#cards{grid-template-columns:minmax(0,1fr)}.card{grid-template-columns:56px minmax(0,1fr);grid-template-rows:auto auto;text-align:left;justify-items:start;column-gap:12px;row-gap:2px;padding:0 12px 12px}
   .card .band{grid-column:1/-1;margin-bottom:6px;text-align:center}.card canvas{grid-row:2/4;width:56px;height:56px;align-self:center}.card small{grid-column:2}.card .lv{top:auto;bottom:10px}
   #go{height:72px;font-size:34px}}
-#pouchClose,#dieClose{flex:none;width:44px;height:44px;font:22px/1 "Archivo Black",sans-serif;cursor:pointer}
+#pouchClose,#dieClose,#instClose{flex:none;width:44px;height:44px;font:22px/1 "Archivo Black",sans-serif;cursor:pointer}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px}
 /* ---- ambient motion: slow, small, always on (off for reduced motion or with Juice off) ---- */
 @keyframes breathe{0%,100%{rotate:0deg;scale:1}50%{rotate:-.35deg;scale:1.01}}
@@ -114,6 +133,7 @@ button{font:inherit;color:var(--ink)}
 <div id="opt">
   <button class="tog slab" id="optBtn" aria-expanded="false">Options</button>
   <div id="panel">
+    <button class="tog slab" id="tMenu">Main menu</button>
     <button class="tog slab" id="tJuice" aria-pressed="true">Juice</button>
     <button class="tog slab" id="tSlow" aria-pressed="false">Slow-mo</button>
     <button class="tog slab" id="tSound" aria-pressed="true">Sound</button>
@@ -130,6 +150,21 @@ button{font:inherit;color:var(--ink)}
 <div id="dieDlg" role="dialog" aria-modal="true" aria-labelledby="dieTitle"><div id="dieBox" class="slab">
   <div class="head"><div style="display:flex;gap:12px;align-items:center;min-width:0"><canvas id="dieIco" style="position:static;width:64px;height:64px;flex:none"></canvas><div style="min-width:0"><h2 id="dieTitle">d6 die</h2><p class="note" id="dieSub"></p></div></div><button id="dieClose" class="slab" aria-label="Close die info">×</button></div>
   <div id="dieBody" style="display:grid;gap:10px"></div>
+</div></div>
+<div id="menu" role="dialog" aria-modal="true" aria-labelledby="logo"><div id="menuBox">
+  <img id="menuIco" src="icon-192.png" alt="">
+  <h1 id="logo">ODDS<span>ENGINE</span></h1>
+  <p class="tag">One press. A lot happens.</p>
+  <button id="mPlay" class="slab bright mbtn">PLAY</button>
+  <button id="mNew" class="slab mbtn sec" hidden>NEW RUN</button>
+  <button id="mInstall" class="slab mbtn sec">INSTALL APP<small id="mInstSub"></small></button>
+  <p class="tag" id="mBest" style="opacity:.75;font-size:13px"></p>
+</div></div>
+<div id="instDlg" role="dialog" aria-modal="true" aria-labelledby="instTitle"><div id="instBox" class="slab">
+  <div class="head"><div style="display:flex;gap:12px;align-items:center;min-width:0"><img src="icon-192.png" alt="" style="width:56px;height:56px;border-radius:14px;border:3px solid var(--line);flex:none"><div style="min-width:0"><h2 id="instTitle">Install Odds Engine</h2><p class="note" id="instDev"></p></div></div><button id="instClose" class="slab" aria-label="Close">×</button></div>
+  <div class="perks"><span>Full screen</span><span>On your home screen</span><span>Plays offline</span></div>
+  <div id="instBody" style="display:grid;gap:12px"></div>
+  <button id="instLater" class="slab mbtn sec" style="min-height:48px;font-size:17px">Not now</button>
 </div></div>
 <div id="ui"><button id="go" class="slab bright"><span id="goLbl">FLIP</span><small id="goLeft"></small></button></div>
 <div id="lvl" role="dialog" aria-modal="true" aria-labelledby="lvTitle">
@@ -384,7 +419,7 @@ const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;let tA=0;const a
 const motes=Array.from({length:14},()=>({x:Math.random(),y:Math.random(),v:6+Math.random()*10,ph:Math.random()*6.28,r:1.5+Math.random()*2.5,k:Math.random()<.5}));
 const UI={k:1,st:0,hudY:48,barY:100,pipY:124};
 let zones=[],W=0,H=0,dpr=1,playTop=130,playBot=400,coinTop=200,trayX=0,trayW=0;
-let dice=[],coins=[],fading=[],events=[],T=0,busy=false,queued=false,holding=false,pending=null,J=true,lvlOpen=false,lvDelay=-1,offersNow=[];
+let dice=[],coins=[],fading=[],events=[],T=0,busy=false,queued=false,holding=false,pending=null,J=true,lvlOpen=false,lvDelay=-1,offersNow=[],menuOpen=false;
 let ph={tot:0,heads:0,n:0,streak:0,lines:[],paid:[],miss:[],paidKeys:new Set()},tease=null,reels=null,coinId=0,reelTick=0;
 const TEASE=1.5;
 // every pop-up is shrunk to fit and nudged inside the screen edges, so no text ever clips on narrow phones
@@ -461,10 +496,10 @@ function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setIt
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
 function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];S.dp=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];busy=false;save();layout();const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)];sfx.buy()}
-function refreshGo(){const h=busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
+function refreshGo(){const h=menuOpen||busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
   if(!h){go.classList.remove('ready');void go.offsetWidth;go.classList.add('ready');sfx.ready()}else go.classList.remove('down')}
 function press(){
-  if(lvlOpen||lvDelay>=0||busy)return;
+  if(menuOpen||lvlOpen||lvDelay>=0||busy)return;
   audio();
   if(score.value>=need()||(!calibrating()&&S.left<=0))return;
   setBusy(true);S.presses++;if(calibrating())S.calib++;else{S.left--;freePips.delete(S.left)}updateGoLabel();save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;ph.dq=[];ph.mult=1;dice.forEach(d=>{d.armed=false;d.refunded=false});
@@ -750,7 +785,7 @@ function pick(p,swapIdx){
   if(!lvlOpen)return;
   if(p.die&&dice.length>=S.slots&&swapIdx===undefined){showSwap(p);return}
   if(p.part&&S.parts.length>=PSLOTS&&swapIdx===undefined){showPartSwap(p);return}
-  lvlOpen=false;lvlEl.classList.remove('open');sfx.buy();hideSwap();
+  lvlOpen=false;lvlEl.classList.remove('open');sfx.buy();hideSwap();maybeAskInstall();
   world.coins=[];const carry=Math.max(0,score.value-need());score.value=score.shown=carry;const wasCalib=calibrating();if(wasCalib)S.budget=BUDGET;S.lv++;S.left=budget();
   if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}
   if(S.lv%4===0)S.rerolls++;freePips.clear();
@@ -1119,9 +1154,75 @@ function frame(now){
 }
 
 // ================= update check =================
+// ================= install as an app (PWA) + main menu =================
+let bip=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();bip=e;refreshInstall()});
+addEventListener('appinstalled',()=>{bip=null;closeInst();refreshInstall()});
+if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+// what we're running on, so the install steps match the actual phone/computer and browser
+function device(){
+  const ua=navigator.userAgent,iPadOS=/Macintosh/.test(ua)&&navigator.maxTouchPoints>1,ios=/iPhone|iPad|iPod/.test(ua)||iPadOS,android=/Android/.test(ua);
+  const inapp=/FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|TikTok|musical_ly|Snapchat|; wv\)/.test(ua);
+  let browser=ios?(/CriOS/.test(ua)?'chrome':/FxiOS/.test(ua)?'firefox':/EdgiOS/.test(ua)?'edge':'safari')
+    :/SamsungBrowser/.test(ua)?'samsung':/Firefox\//.test(ua)?'firefox':/Edg(A)?\//.test(ua)?'edge':/OPR\//.test(ua)?'opera':/Chrome\//.test(ua)?'chrome':/Safari\//.test(ua)?'safari':'other';
+  if(inapp)browser='inapp';
+  const kind=ios?(iPadOS||/iPad/.test(ua)?'ipad':'iphone'):android?(/Mobile/.test(ua)?'android-phone':'android-tablet'):'desktop';
+  const os=ios?'ios':android?'android':/Mac/.test(ua)?'mac':/CrOS/.test(ua)?'chromeos':/Win/.test(ua)?'windows':/Linux/.test(ua)?'linux':'other';
+  return{ios,android,mobile:ios||android,kind,os,browser,sv:+((ua.match(/Version\/(\d+)/)||[])[1]||0),
+    standalone:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}}
+const DEV=device();
+const SHARE='<svg width="13" height="15" viewBox="0 0 14 16" aria-hidden="true"><path d="M7 1v9M3.5 4.5 7 1l3.5 3.5M2.5 7.5H1.5v7h11v-7h-1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+const ki=x=>`<span class="ki">${x}</span>`;
+function installSteps(){const d=DEV,b=d.browser;
+  if(d.standalone)return{done:true};
+  if(bip)return{native:true};
+  if(b==='inapp')return{steps:[d.ios?`Tap ${ki('···')} or ${ki(SHARE)} and choose ${ki('Open in Safari')}`:`Tap ${ki('⋮')} and choose ${ki('Open in Chrome')} (or your browser)`,'Open this menu again there for the install steps'],
+    note:"You're in an app's built-in browser (Instagram, TikTok and so on), which can't install games."};
+  if(d.ios){
+    if(b==='safari'&&d.sv>=26)return{steps:[`Tap ${ki('···')} next to the address bar`,`Tap ${ki(SHARE+' Share')}`,`Scroll down and tap ${ki('Add to Home Screen')}`,`Keep ${ki('Open as Web App')} on and tap ${ki('Add')}`]};
+    if(b==='safari')return{steps:[`Tap ${ki(SHARE+' Share')} ${d.kind==='ipad'?'at the top of the screen':'at the bottom of the screen'}`,`Scroll down and tap ${ki('Add to Home Screen')}`,`Tap ${ki('Add')}`]};
+    if(b==='chrome')return{steps:[`Tap ${ki(SHARE+' Share')} in the address bar`,`Tap ${ki('Add to Home Screen')}`,`Tap ${ki('Add')}`],note:"Needs iOS 16.4 or later. If you don't see it, open this page in Safari."};
+    return{steps:[`Open the browser menu and tap ${ki(SHARE+' Share')}`,`Tap ${ki('Add to Home Screen')}`,`Tap ${ki('Add')}`],note:"If it isn't there, open this page in Safari and add it from there."}}
+  if(d.android){
+    if(b==='samsung')return{steps:[`Tap ${ki('☰')} at the bottom right`,`Tap ${ki('Add page to')}`,`Choose ${ki('Home screen')}`]};
+    if(b==='firefox')return{steps:[`Tap ${ki('⋮')}`,`Tap ${ki('Add app to Home screen')} (or ${ki('Install')})`,`Confirm with ${ki('Add')}`]};
+    if(b==='chrome')return{steps:[`Tap ${ki('⋮')} at the top right`,`Tap ${ki('Add to home screen')} (or ${ki('Install app')})`,`Tap ${ki('Install')}`]};
+    return{steps:['Open the browser menu',`Tap ${ki('Add to home screen')} or ${ki('Install')}`,'Confirm']}}
+  if(b==='chrome')return{steps:['Click the install icon at the right end of the address bar',`Or open ${ki('⋮')} → ${ki('Cast, save, and share')} → ${ki('Install page as app')}`]};
+  if(b==='edge')return{steps:['Click the app icon at the right end of the address bar',`Or open ${ki('···')} → ${ki('Apps')} → ${ki('Install this site as an app')}`]};
+  if(b==='safari'&&d.os==='mac')return{steps:[`In the menu bar choose ${ki('File')} → ${ki('Add to Dock')}`,`Click ${ki('Add')}`],note:'Needs macOS Sonoma or later.'};
+  return{steps:[],note:"This browser can't install web apps. Open the game in Chrome or Edge to install it, or just bookmark it."}}
+function devLabel(){const d=DEV,K={iphone:'iPhone',ipad:'iPad','android-phone':'Android phone','android-tablet':'Android tablet',desktop:{mac:'Mac',windows:'Windows PC',chromeos:'Chromebook',linux:'Linux PC'}[d.os]||'Computer'},
+  B={safari:'Safari',chrome:'Chrome',firefox:'Firefox',edge:'Edge',samsung:'Samsung Internet',opera:'Opera',inapp:'in-app browser',other:'browser'};return`${K[d.kind]} · ${B[d.browser]}`}
+const instDlg=$('#instDlg');
+function openInst(prompted){const r=installSteps(),B=$('#instBody');$('#instDev').textContent='Detected: '+devLabel();B.innerHTML='';
+  if(prompted)B.insertAdjacentHTML('beforeend','<p class="note">Enjoying it? Put it on your home screen and it plays like a real app.</p>');
+  if(r.done)B.insertAdjacentHTML('beforeend',"<p class=\"note\">You're already playing the installed app.</p>");
+  else if(r.native){const b=document.createElement('button');b.className='slab bright mbtn';b.textContent='INSTALL';
+    b.addEventListener('click',async()=>{const e=bip;if(!e)return;bip=null;e.prompt();try{const c=await e.userChoice;if(c.outcome==='accepted')closeInst()}catch(_){}refreshInstall()});
+    B.appendChild(b);B.insertAdjacentHTML('beforeend','<p class="note">One tap and it lands on your home screen or app list.</p>')}
+  else{if(r.steps.length)B.insertAdjacentHTML('beforeend','<ol class="steps">'+r.steps.map(x=>`<li><span>${x}</span></li>`).join('')+'</ol>');if(r.note)B.insertAdjacentHTML('beforeend',`<p class="note">${r.note}</p>`)}
+  $('#instLater').textContent=prompted?'Not now':'Close';instDlg.classList.add('open');setTimeout(()=>$('#instClose').focus({preventScroll:true}),30)}
+function closeInst(){instDlg.classList.remove('open')}
+$('#instClose').addEventListener('click',closeInst);$('#instLater').addEventListener('click',closeInst);instDlg.addEventListener('click',e=>{if(e.target===instDlg)closeInst()});
+// asked once, on phones, right after the first round of upgrades
+function maybeAskInstall(){let asked=false;try{asked=!!localStorage.getItem('oddsEngine.installAsked')}catch(e){}
+  if(asked||!DEV.mobile||DEV.standalone)return;try{localStorage.setItem('oddsEngine.installAsked','1')}catch(e){}const ask=()=>{if(over||menuOpen)return;if(lvlOpen||lvDelay>=0||busy){setTimeout(ask,800);return}openInst(true)};setTimeout(ask,1100)}
+function refreshInstall(){const r=installSteps();$('#mInstall').hidden=!!r.done;$('#mInstSub').textContent=r.native?'one tap':DEV.mobile?'add it to your home screen':'play it in its own window'}
+// main menu: shown when the game opens, and from Options
+const menuEl=$('#menu');let newArm=-1e9;
+function refreshMenu(){const run=S.presses>0;$('#mPlay').innerHTML=run?`CONTINUE<small>level ${S.lv}</small>`:'PLAY';$('#mNew').hidden=!run;$('#mNew').textContent='NEW RUN';newArm=-1e9;
+  $('#mBest').textContent=bestLv>1?`Best run: level ${bestLv}`:'';refreshInstall()}
+function openMenu(){menuOpen=true;refreshMenu();menuEl.classList.add('open');refreshGo();setTimeout(()=>$('#mPlay').focus({preventScroll:true}),30)}
+function closeMenu(){menuOpen=false;menuEl.classList.remove('open');refreshGo()}
+$('#mPlay').addEventListener('click',()=>{audio();sfx.press();closeMenu()});
+$('#mNew').addEventListener('click',e=>{const b=e.currentTarget;if(performance.now()-newArm>2500){newArm=performance.now();b.innerHTML='NEW RUN<small>tap again: this run will be lost</small>';return}audio();newRun();closeMenu()});
+$('#mInstall').addEventListener('click',()=>{audio();sfx.press();openInst(false)});
+$('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$('#optBtn').setAttribute('aria-expanded','false');openMenu()});
+openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126155445';let updShown=false,updDismissed='';
+const BUILD='20261126160253';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1144,6 +1245,8 @@ go.addEventListener('pointerdown',e=>{e.preventDefault();go.classList.add('down'
 const release=()=>{go.classList.remove('down')};
 ['pointerup','pointerleave','pointercancel'].forEach(ev=>go.addEventListener(ev,release));
 addEventListener('keydown',e=>{
+  if(instDlg.classList.contains('open')){if(e.code==='Escape')closeInst();return}
+  if(menuOpen)return;
   if(dieDlg.classList.contains('open')){if(e.code==='Escape')closeDie();return}
   if(pouchDlg.classList.contains('open')){if(e.code==='Escape'||e.code==='KeyP')pouchDlg.classList.remove('open');return}
   if(e.code==='KeyP'&&!lvlOpen&&!over){openPouch();return}
