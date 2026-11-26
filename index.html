@@ -732,7 +732,7 @@ function effectsPhase(){
 function fxPop(c,txt,o={}){if(J)world.popText(txt,c.tx,c.ty-c.r*1.05,{size:o.size||Math.max(18,Math.min(36,c.r*.7)),ci:o.ci??3,layers:o.layers||1,kick:o.kick,life:o.life||.9})}
 function runFx(c){
   if(c.type==='mirror'){const tg=c.mtg;let src=tg,k=0;while(src&&src.type==='mirror'&&src.mdir&&!src.final&&k<8){src=src.mtg;k++}
-    const h=!!(src&&src.final&&src.res==='h');c.res=h?'h':'t';c.copyVal=h?(src.val||0):0;c.noAgain=true;c.hl=1;c.j.punch(14).wobble(.4);sfx.fx(0);
+    const h=!!(src&&src.final&&src.res==='h');c.res=h?'h':'t';c.copyVal=h?(src.val||0):0;c.look=h?(src.type||'plain'):null;c.noAgain=true;c.hl=1;c.j.punch(14).wobble(.4);sfx.fx(0);
     if(tg){tg.hl=1;tg.j.punch(8)}fxPop(c,'MIRROR',{ci:5,layers:2});ph.left++;startFlip(c);return}
   const nb=nbrs(c);c.hl=1;c.j.punch(14).wobble(.4);nb.forEach(o=>{o.hl=.8;o.j.punch(4)});
   if(c.type==='magnet'){const tl=nb.filter(o=>o.final&&o.res!=='h');sfx.fx(0);
@@ -1000,7 +1000,7 @@ function glyph(g,type,r,dir){
 function drawCoin(c){
   const j=c.j,t=j.xf();if(t.s<.02)return;const r=c.r;let w=1,face=c.face||'h';
   if(c.flipping){const p0=Math.min(1,(T-c.t0)/c.dur),p=c.tease?1-Math.pow(1-p0,3):p0,ang=p*(c.spins||(c.res==='h'?6:7))*Math.PI,cs=Math.cos(ang);w=Math.abs(cs);face=cs>=0?'h':'t'}
-  const typ=c.type||'plain',spec=typ!=='plain',gold=typ==='gold',ew=r*Math.max(.1,w),step=cycleIndex(),a=J?Math.max(j.motion,c.hl,c.flipping?.8:0,gold?.6:0):0,Hd=face==='h',lw=Math.max(2,r*.08);
+  const typ=c.look||c.type||'plain',spec=typ!=='plain',gold=typ==='gold',ew=r*Math.max(.1,w),step=cycleIndex(),a=J?Math.max(j.motion,c.hl,c.flipping?.8:0,gold?.6:0):0,Hd=face==='h',lw=Math.max(2,r*.08);
   if(cfg.shadow&&a>.02&&!(c.ra<1))for(let L=(gold?2:cfg.layers)-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*r/30);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y);ctx.rotate(q.r);ctx.scale(q.s,q.s);ctx.fillStyle=pal(step+j.ci+L*2);ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
   ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);if(tease&&c!==tease.c&&!tease.line.cs.includes(c))ctx.globalAlpha=.28;if(c.ra<1)ctx.globalAlpha*=Math.max(0,c.ra);
   const dim=c.dim&&!c.flipping,blank=!c.face&&!c.flipping,fill=blank?th.blank:Hd?COINS[typ].col:dim?th.tails:th.mid,clw=Math.max(3,r*.11);
@@ -1008,6 +1008,7 @@ function drawCoin(c){
   ctx.fillStyle=fill;ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=clw;ctx.strokeStyle=th.line;ctx.stroke();
   if(spec&&!Hd||spec&&blank){ctx.lineWidth=Math.max(3,r*.16);ctx.strokeStyle=COINS[typ].col;ctx.beginPath();ctx.ellipse(0,0,ew*.78,r*.78,0,0,7);ctx.stroke();ctx.strokeStyle=th.line}
   ctx.lineWidth=Math.max(2,r*.07);ctx.beginPath();ctx.ellipse(0,0,ew*.8,r*.8,0,0,7);ctx.stroke();
+  if(c.look){ctx.save();ctx.setLineDash([r*.16,r*.12]);ctx.lineWidth=Math.max(2,r*.08);ctx.strokeStyle=COINS.mirror.col;ctx.beginPath();ctx.ellipse(0,0,ew*.92,r*.92,0,0,7);ctx.stroke();ctx.restore()}
   if(w>.35&&!dim&&!blank){ctx.fillStyle='rgba(255,255,255,.5)';ctx.beginPath();ctx.ellipse(-r*.3*w,-r*.54,r*.25*w,r*.11,-.45,0,7);ctx.fill()}
   if(w>.25){ctx.save();ctx.scale(w,1);ctx.fillStyle='#0d0a18';ctx.textAlign='center';ctx.textBaseline='middle';
     if(blank){if(spec){const a_=typ==='mirror'?1:.55;ctx.globalAlpha*=a_;glyph(ctx,typ,r*.8,c.mdir);ctx.globalAlpha/=a_}else{ctx.font=`${Math.round(r*.8)}px "Archivo Black", Impact, sans-serif`;ctx.fillText('?',0,r*.05)}}
@@ -1355,7 +1356,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126172824';let updShown=false,updDismissed='';
+const BUILD='20261126173425';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
