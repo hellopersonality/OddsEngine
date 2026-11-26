@@ -20,8 +20,8 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 button{font:inherit;color:var(--ink)}
 /* chunky toy slabs: black outline, a solid side in --rim with its own outline, then a soft drop */
 .slab{--dp:6px;border:4px solid var(--line);border-radius:14px;background:var(--surf);color:var(--ink);box-shadow:0 calc(var(--dp) + 4px) 0 -4px var(--rim),0 calc(var(--dp) + 4px) 0 0 var(--line),0 calc(var(--dp) + 11px) 0 0 rgba(0,0,0,.35)}
-.tog,#pouchBtn,#pouchClose,#reroll,#swapBack,#updLater,.sw{--dp:4px;background:var(--btn);color:#0b0b0f;font-family:"Archivo Black",sans-serif;font-weight:400}
-#pouchBox .slab{--rim:var(--rim0)}#go,#again,#updGo{--rim:#b89300}#go.last{--rim:#a8281e}
+.tog,#pouchBtn,#pouchClose,#dieClose,#reroll,#swapBack,#updLater,.sw{--dp:4px;background:var(--btn);color:#0b0b0f;font-family:"Archivo Black",sans-serif;font-weight:400}
+#pouchBox .slab,#dieBox .slab{--rim:var(--rim0)}#go,#again,#updGo{--rim:#b89300}#go.last{--rim:#a8281e}
 #go:active,#go.down,.sw:active,#again:active,.card:active,.tog:active,#pouchBtn:active,#reroll:active,#swapBack:active{transform:translateY(var(--dp));box-shadow:0 4px 0 -4px var(--rim),0 4px 0 0 var(--line)}
 .bright{border-color:var(--line);color:#111}
 #ui{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;padding:8px max(14px,env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom))}
@@ -51,13 +51,16 @@ button{font:inherit;color:var(--ink)}
 :focus-visible{outline:3px dashed var(--ink);outline-offset:4px}
 #pouchBtn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));z-index:3;min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
 #pouchBtn.bump{animation:hit .3s}
-#pouchDlg{position:fixed;inset:0;z-index:6;display:none;place-items:center;padding:14px;background:rgba(10,10,12,.8)}#pouchDlg.open{display:grid}
-#pouchBox{width:100%;max-width:520px;max-height:90vh;overflow:auto;padding:18px;display:grid;gap:12px;--rim:var(--accent);--dp:8px}
-#pouchBox .ptitle{margin:8px 0 0;font:16px/1 "Archivo Black",sans-serif;letter-spacing:.04em}
-#pouchBox h2{margin:0;font:28px/1 "Archivo Black",sans-serif}#pouchBox .note{margin:0;color:var(--muted);font-size:14px}
+#pouchDlg,#dieDlg{position:fixed;inset:0;z-index:6;display:none;place-items:center;padding:14px;background:rgba(10,10,12,.8)}#pouchDlg.open,#dieDlg.open{display:grid}
+#pouchBox,#dieBox{width:100%;max-width:520px;max-height:90vh;overflow:auto;padding:18px;display:grid;gap:12px;--rim:var(--accent);--dp:8px}
+#pouchBox .ptitle,#dieBox .ptitle{margin:8px 0 0;font:16px/1 "Archivo Black",sans-serif;letter-spacing:.04em}
+#pouchBox h2,#dieBox h2{margin:0;font:28px/1 "Archivo Black",sans-serif}#pouchBox .note,#dieBox .note{margin:0;color:var(--muted);font-size:14px}
 .prow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 10px}
 .prow canvas{position:static;width:44px;height:44px}.prow b{display:block;font:16px/1.15 "Archivo Black",sans-serif}.prow small{color:var(--muted);font-size:14px}
 .prow .n{font:22px/1 "Archivo Black",sans-serif}
+.faces{display:flex;flex-wrap:wrap;gap:8px}.face{min-width:34px;height:34px;padding:0 4px;box-sizing:border-box;display:grid;place-items:center;border:3px solid var(--line);border-radius:9px;background:var(--surf);color:var(--ink);font:14px/1 "Archivo Black",sans-serif;box-shadow:0 3px 0 var(--line)}
+.face.fx{color:#fff}.face.max{outline:3px solid #ff4b3e;outline-offset:2px}.face.dead{opacity:.3}.face.cur{transform:translateY(-4px);box-shadow:0 7px 0 var(--line)}
+.gb{width:40px;height:40px;border-radius:50%;border:3px solid #111;box-sizing:border-box;display:grid;place-items:center;font:15px/1 "Archivo Black",sans-serif;color:#111;box-shadow:0 3px 0 #111}
 #opt{position:fixed;top:calc(10px + env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));display:grid;justify-items:end;gap:8px;z-index:3}
 .tog{min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
 .tog[aria-pressed=false]{opacity:.55}
@@ -86,7 +89,7 @@ button{font:inherit;color:var(--ink)}
 @media(max-width:560px){#cards{grid-template-columns:minmax(0,1fr)}.card{grid-template-columns:56px minmax(0,1fr);grid-template-rows:auto auto;text-align:left;justify-items:start;column-gap:12px;row-gap:2px;padding:0 12px 12px}
   .card .band{grid-column:1/-1;margin-bottom:6px;text-align:center}.card canvas{grid-row:2/4;width:56px;height:56px;align-self:center}.card small{grid-column:2}.card .lv{top:auto;bottom:10px}
   #go{height:72px;font-size:34px}}
-#pouchClose{width:44px;height:44px;font:22px/1 "Archivo Black",sans-serif;cursor:pointer}
+#pouchClose,#dieClose{flex:none;width:44px;height:44px;font:22px/1 "Archivo Black",sans-serif;cursor:pointer}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px}
 /* ---- ambient motion: slow, small, always on (off for reduced motion or with Juice off) ---- */
 @keyframes breathe{0%,100%{rotate:0deg;scale:1}50%{rotate:-.35deg;scale:1.01}}
@@ -123,6 +126,10 @@ button{font:inherit;color:var(--ink)}
   <div class="head"><h2 id="pouchTitle">POUCH</h2><button id="pouchClose" class="slab" aria-label="Close pouch">×</button></div>
   <p class="note">Your dice decide how many coins flip. Every special coin you own plays in every press, at a random spot, as long as the dice give enough coins (if not, a random handful play). Plain coins fill the rest.</p>
   <div id="pouchList" style="display:grid;gap:10px"></div>
+</div></div>
+<div id="dieDlg" role="dialog" aria-modal="true" aria-labelledby="dieTitle"><div id="dieBox" class="slab">
+  <div class="head"><div style="display:flex;gap:12px;align-items:center;min-width:0"><canvas id="dieIco" style="position:static;width:64px;height:64px;flex:none"></canvas><div style="min-width:0"><h2 id="dieTitle">d6 die</h2><p class="note" id="dieSub"></p></div></div><button id="dieClose" class="slab" aria-label="Close die info">×</button></div>
+  <div id="dieBody" style="display:grid;gap:10px"></div>
 </div></div>
 <div id="ui"><button id="go" class="slab bright"><span id="goLbl">FLIP</span><small id="goLeft"></small></button></div>
 <div id="lvl" role="dialog" aria-modal="true" aria-labelledby="lvTitle">
@@ -790,6 +797,39 @@ function openPouch(){const L=$('#pouchList');L.innerHTML='';
     const tx=document.createElement('div'),b=document.createElement('b'),sm=document.createElement('small');b.textContent=PARTS[id].name;sm.textContent=PARTS[id].desc;tx.append(b,sm);row.append(cv_,tx,document.createElement('span'));L.appendChild(row)});
   if(!S.parts.length){const e=document.createElement('p');e.className='note';e.textContent='No parts yet. Rule-changing parts come from level-up cards.';L.appendChild(e)}
   pouchDlg.classList.add('open');setTimeout(()=>$('#pouchClose').focus(),30)}
+// ---- die info: tap a die to see what it is and everything acting on it ----
+const dieDlg=$('#dieDlg');
+function openDie(i){const d=dice[i];if(!d)return;const q=d.fx?FXD[d.fx]:null,lo=Math.min(S.minFace,d.sides),B=$('#dieBody');B.innerHTML='';
+  const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+  const sec=t=>B.appendChild(el('h3','ptitle',t));
+  const row=(ico,name,desc)=>{const r=el('div','prow slab'),tx=el('div');tx.append(el('b',null,name),el('small',null,desc));r.append(ico,tx,el('span'));B.appendChild(r)};
+  const gb=(bg,g,fg='#111')=>{const e=el('span','gb',g);e.style.background=bg;e.style.color=fg;return e};
+  dieIcon($('#dieIco'),d.sides,64,d.fx);
+  $('#dieTitle').textContent=q?q.name:`d${d.sides} die`;
+  $('#dieSub').textContent=`${d.sides}-sided · rolls ${lo}–${d.sides} · slot ${i+1} of ${S.slots}`+(d.rolling?'':` · showing ${d.face}`);
+  sec('FACES');const F=el('div','faces');
+  for(let f=1;f<=d.sides;f++){const c=el('span','face',String(f));if(f<lo)c.classList.add('dead');if(q&&q.faces.includes(f)){c.classList.add('fx');c.style.background=q.acc}
+    if(f===d.sides)c.classList.add('max');if(!d.rolling&&f===d.face)c.classList.add('cur');F.appendChild(c)}
+  B.appendChild(F);
+  const key=[];if(q)key.push('coloured faces trigger its effect');key.push('red outline: max roll');if(lo>1)key.push(`faded: can't roll below ${lo}`);key.push('raised: current face');
+  B.appendChild(el('p','note',key.join(' · ').replace(/^./,c=>c.toUpperCase())));
+  B.appendChild(el('p','note',`Each roll spills that many coins${hasPart('overclock')?' (doubled by Overclock)':''}.`));
+  if(q){sec('EFFECT');row(gb(q.acc,q.glyph,'#fff'),`On ${q.faces.join(' or ')}`,q.desc.replace(/^A d\d+\. /,''))}
+  const has=S.boom||S.rebate||S.minFace>1||S.sixes||['overclock','sevens','reels'].some(hasPart);
+  sec('ON EVERY DIE');
+  if(S.boom)row(gb('#ff9f1c',S.boom>1?String(S.boom):'✸'),'Exploding dice',`A max roll rolls again and adds, up to ${S.boom} time${S.boom>1?'s':''} in a row`);
+  if(S.rebate)row(gb('#4cc9f0','↺'),'Rebate',`A max roll gives the press back, up to ${S.rebate} per press`+(busy?` (${Math.max(0,S.rebate-ph.refunds)} left this press)`:''));
+  if(S.minFace>1)row(gb('#a9b4c4','≥'+S.minFace),'Loaded dice',`Never rolls below ${S.minFace}`);
+  if(S.sixes)row(gb('#3ddc97','+'+S.sixes),'Max roll bonus',`A max roll adds ${S.sixes} bonus coins`);
+  [['overclock','Spills twice the coins (1 fewer press per level)'],['sevens','If all your dice add up to a multiple of 7, the press pays ×2'],['reels','If two dice show the same number, the board spins after the flips']]
+    .forEach(([id,t])=>{if(!hasPart(id))return;const c=document.createElement('canvas');partIcon(c,id,44);row(c,PARTS[id].name+' (part)',t)});
+  if(!has)B.appendChild(el('p','note','No upgrades on your dice yet. Exploding dice, Rebate, Loaded dice and more come from level-up cards.'));
+  dieDlg.classList.add('open');requestAnimationFrame(fitAll);setTimeout(()=>$('#dieClose').focus(),30)}
+const closeDie=()=>dieDlg.classList.remove('open');
+$('#dieClose').addEventListener('click',closeDie);dieDlg.addEventListener('click',e=>{if(e.target===dieDlg)closeDie()});
+const dieAt=(x,y)=>dice.findIndex(d=>Math.hypot(x-d.j.p.x.x,y-d.j.p.y.x)<d.size*.8);
+cv.addEventListener('pointerdown',e=>{if(lvlOpen||over||pouchDlg.classList.contains('open')||dieDlg.classList.contains('open'))return;const i=dieAt(e.clientX,e.clientY);if(i>=0){audio();sfx.press();dice[i].j.punch(8);openDie(i)}});
+cv.addEventListener('pointermove',e=>{cv.style.cursor=dieAt(e.clientX,e.clientY)>=0?'pointer':''});
 pouchBtn.addEventListener('click',openPouch);$('#pouchClose').addEventListener('click',()=>pouchDlg.classList.remove('open'));
 pouchDlg.addEventListener('click',e=>{if(e.target===pouchDlg)pouchDlg.classList.remove('open')});
 pouchBtn.textContent=pouchLabel();
@@ -903,7 +943,9 @@ const bpulse=(d,k)=>{(d.bp||(d.bp={}))[k]=1};
 function drawBadges(d,t){
   const list=[];if(d.fx)list.push('fx');if(S.rebate)list.push('rebate');if(S.boom)list.push('boom');if(S.minFace>1)list.push('loaded');if(S.sixes)list.push('sixes');if(!list.length||t.s<.05)return;
   const s=d.size,R=Math.max(8,s*.21);
-  list.forEach((k,i)=>{const p=(d.bp&&d.bp[k])||0,sc=t.s*(1+.6*p*p),x=t.x+(i-(list.length-1)/2)*(R*2+3),y=t.y+s*.66;
+  const room=(zones.length>1?zones[1].x-zones[0].x:s*1.5)-6,step=list.length>1?Math.min(R*2+3,(room-R*2)/(list.length-1)):0;
+  // too many perks for the space under a die: badges overlap like a stack of chips
+  list.forEach((k,i)=>{const p=(d.bp&&d.bp[k])||0,sc=t.s*(1+.6*p*p),x=t.x+(i-(list.length-1)/2)*step,y=t.y+s*.66;
     ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);ctx.lineWidth=Math.max(2,R*.24);ctx.strokeStyle=th.line;ctx.lineJoin='round';
     if(k==='boom'){ctx.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8-Math.PI/2,q=i%2?R*.7:R*1.15;ctx.lineTo(Math.cos(a)*q,Math.sin(a)*q)}ctx.closePath();ctx.fillStyle='#ff9f1c';ctx.fill();ctx.stroke()}
     else{ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fillStyle=k==='fx'?FXD[d.fx].acc:k==='rebate'?'#4cc9f0':k==='loaded'?'#a9b4c4':'#3ddc97';ctx.fill();ctx.stroke();
@@ -1032,7 +1074,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126045855';let updShown=false,updDismissed='';
+const BUILD='20261126050255';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1055,6 +1097,7 @@ go.addEventListener('pointerdown',e=>{e.preventDefault();go.classList.add('down'
 const release=()=>{go.classList.remove('down')};
 ['pointerup','pointerleave','pointercancel'].forEach(ev=>go.addEventListener(ev,release));
 addEventListener('keydown',e=>{
+  if(dieDlg.classList.contains('open')){if(e.code==='Escape')closeDie();return}
   if(pouchDlg.classList.contains('open')){if(e.code==='Escape'||e.code==='KeyP')pouchDlg.classList.remove('open');return}
   if(e.code==='KeyP'&&!lvlOpen&&!over){openPouch();return}
   if(over){if(e.code==='Enter'||e.code==='Space'){e.preventDefault();newRun()}return}
