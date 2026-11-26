@@ -74,7 +74,7 @@ button{font:inherit;color:var(--ink)}
 @keyframes ready{40%{scale:1.05 1.1}}
 @keyframes hit{35%{scale:1.03 .92}70%{scale:.99 1.04}}
 :focus-visible{outline:3px dashed var(--ink);outline-offset:4px}
-#pouchBtn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));z-index:3;min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
+#pouchBtn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:max(calc(12px + var(--hudIn,0px)),env(safe-area-inset-left));z-index:3;min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
 #pouchBtn.bump{animation:hit .3s}
 #pouchDlg,#dieDlg,#instDlg{position:fixed;inset:0;z-index:6;display:none;place-items:center;padding:14px;background:rgba(10,10,12,.8)}#pouchDlg.open,#dieDlg.open,#instDlg.open{display:grid}#instDlg{z-index:8}
 #pouchBox,#dieBox,#instBox{width:100%;max-width:520px;max-height:90vh;overflow:auto;padding:18px;display:grid;gap:12px;--rim:var(--accent);--dp:8px}
@@ -98,7 +98,7 @@ button{font:inherit;color:var(--ink)}
 .faces{display:flex;flex-wrap:wrap;gap:8px}.face{min-width:34px;height:34px;padding:0 4px;box-sizing:border-box;display:grid;place-items:center;border:3px solid var(--line);border-radius:9px;background:var(--surf);color:var(--ink);font:14px/1 "Archivo Black",sans-serif;box-shadow:0 3px 0 var(--line)}
 .face.fx{color:#ffffff}.face.max{outline:3px solid #ff1100;outline-offset:2px}.face.dead{opacity:.3}.face.cur{transform:translateY(-4px);box-shadow:0 7px 0 var(--line)}
 .gb{width:40px;height:40px;border-radius:50%;border:3px solid #0d0a18;box-sizing:border-box;display:grid;place-items:center;font:15px/1 "Archivo Black",sans-serif;color:#0d0a18;box-shadow:0 3px 0 #0d0a18}
-#opt{position:fixed;top:calc(10px + env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));display:grid;justify-items:end;gap:8px;z-index:3}
+#opt{position:fixed;top:calc(10px + env(safe-area-inset-top));right:max(calc(12px + var(--hudIn,0px)),env(safe-area-inset-right));display:grid;justify-items:end;gap:8px;z-index:3}
 .tog{min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
 .tog[aria-pressed=false]{opacity:.55}
 #panel{display:none;gap:8px;justify-items:end}#panel.open{display:grid}
@@ -469,6 +469,8 @@ function layout(first){
   UI.k=Math.max(.74,Math.min(1.12,Math.min(W/430,(H-UI.st)/880)));
   UI.hudY=UI.st+Math.round(46*UI.k)+(W<520?4:0);UI.barY=UI.st+Math.round(100*UI.k);UI.pipY=UI.st+Math.round(128*UI.k);
   const uiH=ui.getBoundingClientRect().height;playTop=UI.st+Math.round(158*UI.k);playBot=H-uiH-30;trayW=Math.min(W-(W<520?20:28),660);trayX=W/2-trayW/2;
+  // on wide screens, pin Pouch and Options to the tray's edges instead of the far corners
+  {const e=Math.max(0,Math.round(trayX-12));document.documentElement.style.setProperty('--hudIn',e+'px')}
   hudJ.moveTo(W/2,UI.hudY);barJ.moveTo(W/2,UI.barY);if(first){hudJ.snap(W/2,UI.hudY);barJ.snap(W/2,UI.barY)}
   // dice sit in zones: one socket per randomizer slot, filled left to right, so free slots show without a label
   const n=dice.length,z=n?Math.max(S.slots,n):0,avail=trayW-28;
@@ -1353,7 +1355,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126172406';let updShown=false,updDismissed='';
+const BUILD='20261126172824';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
