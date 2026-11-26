@@ -39,8 +39,8 @@ button{font:inherit;color:var(--ink)}
 .sw canvas{position:static;width:56px;height:56px}
 .sw:active{translate:4px 4px;box-shadow:1px 1px 0 var(--hard)}
 #swapBack{min-height:44px;padding:8px 18px;font-weight:700;cursor:pointer}
-#over .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%;max-width:520px}
-#over .stat{padding:12px;text-align:center}#over .stat b{display:block;font:30px/1.1 "Archivo Black",sans-serif}#over .stat span{font-size:13px;font-weight:700;color:var(--muted)}
+#over .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(8px,2.5vw,12px);width:100%;max-width:520px}
+#over .stat{padding:12px 6px;text-align:center;overflow:hidden}#over .stat b{display:block;white-space:nowrap;overflow:hidden;font:30px/1.1 "Archivo Black",sans-serif}#over .stat span{display:block;font-size:13px;line-height:1.25;font-weight:700;color:var(--muted);text-wrap:balance}
 #again{min-height:64px;padding:10px 34px;font:28px/1 "Archivo Black",sans-serif;background:var(--yellow);cursor:pointer}
 #again:active{translate:4px 4px;box-shadow:1px 1px 0 var(--hard)}
 #go.wait{translate:0 170%;opacity:0;pointer-events:none}
@@ -65,7 +65,9 @@ button{font:inherit;color:var(--ink)}
 #lvBox,#ovBox{width:100%;max-width:760px;display:grid;gap:14px;justify-items:center}
 #lvBox h2,#ovBox h2{text-align:center;margin:0;font:clamp(40px,11vw,64px)/1 "Archivo Black",Impact,sans-serif;color:var(--pal);-webkit-text-stroke:3px #0b0b0f;paint-order:stroke fill;text-shadow:5px 5px 0 var(--pal2);animation:slam .45s cubic-bezier(.2,1.7,.4,1)}
 @keyframes slam{from{transform:scale(2.2) rotate(-8deg);opacity:0}}
-.sub{margin:-6px 0 0;font-weight:700;color:#f2eee6}
+.sub{margin:-6px 0 0;font-weight:700;color:#f2eee6;text-align:center;text-wrap:balance;max-width:34ch}
+.sub span{display:block}
+.fit{white-space:nowrap;overflow:hidden}
 #cards{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .card{position:relative;display:grid;grid-template-rows:auto auto auto 1fr;justify-items:center;text-align:center;gap:8px;padding:0 12px 14px;overflow:hidden;cursor:pointer;opacity:0;animation:flipIn .38s cubic-bezier(.2,1.5,.4,1) forwards;transition:translate .06s,box-shadow .06s}
 .card:hover{translate:0 -4px}
@@ -138,7 +140,7 @@ button{font:inherit;color:var(--ink)}
     <div class="stats">
       <div class="stat slab"><b id="stLv">1</b><span>Level reached</span></div>
       <div class="stat slab"><b id="stBest">0</b><span>Best press</span></div>
-      <div class="stat slab"><b id="stRecord">1</b><span>Best run (level)</span></div>
+      <div class="stat slab"><b id="stRecord">1</b><span>Best level ever</span></div>
     </div>
     <button id="again" class="slab bright">NEW RUN</button>
   </div>
@@ -401,9 +403,15 @@ function resetTray(){
 function setBusy(v){busy=v;refreshGo()}
 // the button only exists while it can actually be pressed
 let goHidden=false,over=false,overDelay=-1;
+// shrink single-line text until it fits its box (big numbers on small phones)
+function fitText(el,max,min=12){el.style.fontSize=max+'px';let f=max;while(el.scrollWidth>el.clientWidth+1&&f>min){f--;el.style.fontSize=f+'px'}}
+function fitAll(){document.querySelectorAll('#over .stat b').forEach(e=>fitText(e,30,14));document.querySelectorAll('.card b,.prow b').forEach(e=>{e.classList.add('fit');fitText(e,parseFloat(getComputedStyle(e).fontSize)>19?19:19,12)})}
+addEventListener('resize',()=>{if(over||lvlOpen)fitAll()});
 function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}$('#stLv').textContent=S.lv;$('#stBest').textContent='+'+fmt(S.best);$('#stRecord').textContent=bestLv;
   const short=need()-score.value;$('#ovTitle').textContent=short<=Math.max(2,need()*.2)?'SO CLOSE!':'OUT OF PRESSES';
-  $('#ovSub').textContent=(short<=Math.max(2,need()*.2)?`Just ${fmt(short)} short of level ${S.lv+1}. `:'')+(dice.length?`Your machine: ${S.sides.map(v=>'d'+v).join(' · ')}`:'');$('#over').classList.add('open');setTimeout(()=>$('#again').focus(),50)}
+  const sub=$('#ovSub');sub.textContent='';const line=t=>{const e=document.createElement('span');e.textContent=t;sub.appendChild(e)};
+  if(short<=Math.max(2,need()*.2))line(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)line(`Your machine: ${S.sides.map(v=>'d'+v).join(' · ')}`);
+  $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
 function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];busy=false;save();layout();const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)];sfx.buy()}
 function refreshGo(){const h=busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
@@ -579,6 +587,7 @@ function showCards(){
     b.addEventListener('click',()=>pick(p));cardsEl.appendChild(b);
     setTimeout(()=>{sfx.card(i);if(p.r===2)sfx.legend()},i*130+60);
   });
+  requestAnimationFrame(fitAll);
   rerollBtn.textContent=`Reroll (${S.rerolls})`;rerollBtn.disabled=S.rerolls<=0;
   setTimeout(()=>{const f=cardsEl.querySelector('.card');if(f)f.focus({preventScroll:true})},450);
 }
@@ -779,7 +788,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126024432';let updShown=false,updDismissed='';
+const BUILD='20261126025128';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
