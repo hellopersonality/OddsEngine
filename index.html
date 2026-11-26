@@ -94,10 +94,10 @@ button{font:inherit;color:var(--ink)}
     <button class="tog slab" id="tReset">Reset save</button>
   </div>
 </div>
-<button id="pouchBtn" class="slab" aria-haspopup="dialog">Pouch 8</button>
+<button id="pouchBtn" class="slab" aria-haspopup="dialog">Pouch</button>
 <div id="pouchDlg" role="dialog" aria-modal="true" aria-labelledby="pouchTitle"><div id="pouchBox" class="slab">
   <div class="head"><h2 id="pouchTitle">COIN POUCH</h2><button id="pouchClose" class="slab" aria-label="Close pouch">×</button></div>
-  <p class="note">Every press draws coins from here at random, as many as your dice roll. Bag empties, it reshuffles.</p>
+  <p class="note">Your dice decide how many coins flip. Every special coin you own plays in every press, at a random spot; plain coins fill the rest.</p>
   <div id="pouchList" style="display:grid;gap:10px"></div>
 </div></div>
 <div id="ui"><button id="go" class="slab bright"><span id="goLbl">FLIP</span><small id="goLeft"></small></button></div>
@@ -250,9 +250,9 @@ let skin='dark';try{skin=localStorage.getItem('oddsEngine.skin')==='light'?'ligh
 let th=SKINS[skin];
 
 // ================= game state =================
-const KEY='oddsEngine.v7',$=s=>document.querySelector(s);
+const KEY='oddsEngine.v8',$=s=>document.querySelector(s);
 const cv=$('#cv'),ctx=cv.getContext('2d'),ui=$('#ui'),go=$('#go'),lvlEl=$('#lvl'),cardsEl=$('#cards'),rerollBtn=$('#reroll');
-const FRESH={pouch:['plain','plain','plain','plain','plain','plain','plain','plain'],lineMult:3,lv:1,slots:5,left:0,budget:0,calib:0,rebate:0,dice:0,sides:[],val:1,luck:0,reflip:0,minFace:1,gold:0,perf:2,sixes:0,chain:0,rerolls:2,presses:0,best:0};
+const FRESH={pouch:[],lineMult:3,lv:1,slots:5,left:0,budget:0,calib:0,rebate:0,dice:0,sides:[],val:1,luck:0,reflip:0,minFace:1,gold:0,perf:2,sixes:0,chain:0,rerolls:2,presses:0,best:0};
 const SIDES=[4,6,8,10,12,20];
 // ---- coin types: live in the pouch; specials with neighbour effects resolve in an effects step after the flips ----
 const COINS={
@@ -265,11 +265,14 @@ const COINS={
   crown:{name:'Crown coin',col:'#ff5ca8',desc:'If heads and every coin touching it is heads: pays ×10'}};
 const FXORDER={magnet:0,ember:1,crown:2};
 const countOf=t=>S.pouch.filter(x=>x===t).length;
+// plain coins are unlimited; the pouch holds only special coins, and every one of them is played each press
+// (if a press has fewer coins than specials, a random handful of specials make it). Positions are shuffled.
 let bag=[];
-function drawPouch(n){const out=[];for(let i=0;i<n;i++){if(!bag.length)bag=[...(S.pouch.length?S.pouch:['plain'])].sort(()=>Math.random()-.5);out.push(bag.pop())}return out}
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+function drawPouch(n){const sp=shuffle([...S.pouch]).slice(0,n);while(sp.length<n)sp.push('plain');return shuffle(sp)}
 const S={...FRESH,sides:[],pouch:[...FRESH.pouch]};
 const score=new CountUp(0);
-const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]);score.value=score.shown=+d.score||0}}catch(e){}
+const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');score.value=score.shown=+d.score||0}}catch(e){}
 S.sides=S.sides.slice(0,S.dice);while(S.sides.length<S.dice)S.sides.push(6);
 function save(){try{localStorage.setItem(KEY,JSON.stringify({...S,score:score.value}))}catch(e){}}
 const ROLL=.8,LAND_GAP=.2,FLIP=.42;
@@ -295,8 +298,7 @@ const POOL=[
   {id:'poly',r:0,max:99,dice:1,name:'Polyhedral',lvl:()=>S.sides.reduce((a,v)=>a+SIDES.indexOf(v)-1,0),ok:()=>S.sides.some(v=>v<20),desc:()=>{const m=Math.min(...S.sides);return`Your smallest die, a d${m}, becomes a d${SIDES[SIDES.indexOf(m)+1]}`}},
   {id:'reflip',r:1,max:3,name:'Second chance',lvl:()=>S.reflip,desc:()=>S.reflip?`${S.reflip+1} tails every press get flipped again`:'One tails every press gets flipped again'},
   {id:'loaded',r:1,max:3,dice:1,name:'Loaded dice',lvl:()=>S.minFace-1,desc:()=>`Dice never roll below ${S.minFace+1}`},
-  ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Adds one to your pouch'})),
-  {id:'thin',r:0,max:99,name:'Lighter pouch',lvl:()=>0,ok:()=>countOf('plain')>=2&&S.pouch.length>4&&S.pouch.some(t=>t!=='plain'),desc:()=>`Remove 2 plain coins so your specials come up more (pouch ${S.pouch.length} → ${S.pouch.length-2})`},
+  ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Goes in your pouch and plays every press'})),
   {id:'perf',r:1,max:4,dice:1,name:'Perfectionist',lvl:()=>S.perf-2,desc:()=>`All heads pays ×${S.perf+1} instead of ×${S.perf}`},
   {id:'sixes',r:1,max:4,dice:1,name:'Max roll bonus',lvl:()=>S.sixes/2,desc:()=>`A die's highest roll (6 on a d6, 20 on a d20) adds ${S.sixes+2} bonus coins`},
   {id:'chain',r:2,max:5,dice:1,name:'Hot streak',lvl:()=>S.chain,desc:()=>`Each heads in a row pays +${S.chain+1} more than the last`}
@@ -521,7 +523,7 @@ function iconFor(id,c){
     if(txt){g.fillStyle='#111';g.font=`${txt.length>2?14:18}px "Archivo Black", sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText(txt,x,y+1)}};
   const poly=(n,txt)=>{g.save();g.translate(30,30);polyPath(g,n,23);g.fillStyle=th.obj;g.save();g.translate(4,4);polyPath(g,n,23);g.fill();g.restore();polyPath(g,n,23);g.fillStyle='#fff';g.fill();g.stroke();g.fillStyle='#111';g.font='16px "Archivo Black", sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(txt,0,2);g.restore()};
   if(/^d\d+$/.test(id)){dieIcon(c,+id.slice(1),64);return}
-  if(id.startsWith('c_')||id==='thin'){coinIcon(c,id==='thin'?'plain':id.slice(2),64,id==='thin');return}
+  if(id.startsWith('c_')){coinIcon(c,id.slice(2),64);return}
   ({lines:()=>{[14,30,46].forEach(x=>coin(x,30,9,'#ffd23f',''));g.lineWidth=5;g.strokeStyle='#ff5ca8';g.beginPath();g.moveTo(8,30);g.lineTo(52,30);g.stroke()},slots:()=>{die(4,14,30,1);die(30,14,30,1)},rebate:()=>coin(30,30,22,'#4cc9f0','+1'),loaded:()=>die(9,9,42,5),sixes:()=>poly(20,'20'),poly:()=>poly(Math.min(...S.sides,20)===20?20:SIDES[SIDES.indexOf(Math.min(...S.sides))+1],'d'+(SIDES[SIDES.indexOf(Math.min(...S.sides))+1]||20)),
     val:()=>coin(30,30,22,'#ffd23f','+1'),luck:()=>coin(30,30,22,'#3ddc97','%'),reflip:()=>coin(30,30,22,'#c9b6ff','↻'),
     gold:()=>coin(30,30,22,'#ff9f1c','×5'),perf:()=>coin(30,30,22,'#ff5ca8','×'+(S.perf+1)),
@@ -564,7 +566,6 @@ function pick(p,swapIdx){
     else{S.dice++;S.sides.push(p.die);addDie(true,p.die);layout();if(S.dice===1)clearCoins()}
   }else({val:()=>{S.val++},luck:()=>{S.luck++},reflip:()=>{S.reflip++},slots:()=>{S.slots++},rebate:()=>{S.rebate++},lines:()=>{S.lineMult++},
     poly:()=>{const m=Math.min(...S.sides),i=S.sides.indexOf(m),nx=SIDES[SIDES.indexOf(m)+1];S.sides[i]=nx;dice[i].sides=nx;dice[i].face=nx;dice[i].j.pop();dice[i].hl=1},
-    thin:()=>{for(let k=0;k<2;k++)S.pouch.splice(S.pouch.indexOf('plain'),1);bag=[];pouchBump()},
     loaded:()=>{S.minFace++},perf:()=>{S.perf++},sixes:()=>{S.sixes+=2},chain:()=>{S.chain++}})[p.id]();
   coins.forEach(c=>{c.j.punch(8);c.hl=1});dice.forEach(d=>{d.j.punch(8);d.hl=1});
   if(J){world.popText(p.name.toUpperCase()+'!',W/2,mid,{size:Math.min(44,W/10),layers:2,kick:6,life:1.3});world.shake(.3)}
@@ -589,15 +590,17 @@ function dieIcon(c,n,size){const g=c.getContext('2d');c.width=c.height=size*2;g.
   g.fillStyle='#111';g.font=`${Math.round(size*.26)}px "Archivo Black", sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText(n===6?'6':String(n),0,n===4?size*.07:2)}
 $('#again').addEventListener('click',newRun);
 const pouchBtn=$('#pouchBtn'),pouchDlg=$('#pouchDlg');
-function pouchBump(){pouchBtn.textContent='Pouch '+S.pouch.length;pouchBtn.classList.remove('bump');void pouchBtn.offsetWidth;pouchBtn.classList.add('bump')}
+function pouchLabel(){return S.pouch.length?`Pouch · ${S.pouch.length} special`:'Pouch'}
+function pouchBump(){pouchBtn.textContent=pouchLabel();pouchBtn.classList.remove('bump');void pouchBtn.offsetWidth;pouchBtn.classList.add('bump')}
 function openPouch(){const L=$('#pouchList');L.innerHTML='';
-  Object.keys(COINS).filter(t=>countOf(t)).forEach(t=>{const row=document.createElement('div');row.className='prow slab';const cv_=document.createElement('canvas');coinIcon(cv_,t,44);
-    const tx=document.createElement('div'),b=document.createElement('b'),sm=document.createElement('small'),n=document.createElement('span');b.textContent=COINS[t].name;sm.textContent=COINS[t].desc;n.className='n';n.textContent='×'+countOf(t);
+  ['plain',...Object.keys(COINS).filter(t=>t!=='plain'&&countOf(t))].forEach(t=>{const row=document.createElement('div');row.className='prow slab';const cv_=document.createElement('canvas');coinIcon(cv_,t,44);
+    const tx=document.createElement('div'),b=document.createElement('b'),sm=document.createElement('small'),n=document.createElement('span');b.textContent=COINS[t].name;sm.textContent=COINS[t].desc;n.className='n';n.textContent=t==='plain'?'∞':'×'+countOf(t);if(t==='plain')sm.textContent='Unlimited. They fill every spot your specials don\'t';
     tx.append(b,sm);row.append(cv_,tx,n);L.appendChild(row)});
+  if(!S.pouch.length){const e=document.createElement('p');e.className='note';e.textContent='No special coins yet. They come from level-up cards.';L.appendChild(e)}
   pouchDlg.classList.add('open');setTimeout(()=>$('#pouchClose').focus(),30)}
 pouchBtn.addEventListener('click',openPouch);$('#pouchClose').addEventListener('click',()=>pouchDlg.classList.remove('open'));
 pouchDlg.addEventListener('click',e=>{if(e.target===pouchDlg)pouchDlg.classList.remove('open')});
-pouchBtn.textContent='Pouch '+S.pouch.length;
+pouchBtn.textContent=pouchLabel();
 rerollBtn.addEventListener('click',()=>{if(S.rerolls<=0||!lvlOpen)return;S.rerolls--;sfx.press();save();showCards()});
 
 // ================= drawing =================
