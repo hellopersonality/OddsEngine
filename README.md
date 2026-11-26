@@ -7,6 +7,7 @@ A juicy, neo-brutalist chance machine for the browser. One press sets the whole 
 - **Level ups** offer three upgrade cards (Common / Rare / Legendary), survivor-style. Rerolls are earned every 4 levels.
 - **Randomizers** (d6 to d20 dice) take up limited slots (5 to start). When full, a new die is swapped in for an old one.
 - **Paylines:** full rows, columns and diagonals of heads pay a multiplier. When a line is one coin away, the machine pauses for a tease.
+- **Coin pouch:** every press draws its coins at random from your pouch. Level-up cards add special coins (golden, lead, wild, ember, magnet, crown) or thin out plain ones. Specials that react to their neighbours resolve in an effects step after the flips.
 - **Press budget:** from level 2, every level gets 5 presses. Run out short of the goal and the run ends.
 
 ## Controls
