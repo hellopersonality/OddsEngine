@@ -120,7 +120,7 @@ button{font:inherit;color:var(--ink)}
 </div>
 <button id="pouchBtn" class="slab" aria-haspopup="dialog">Pouch</button>
 <div id="pouchDlg" role="dialog" aria-modal="true" aria-labelledby="pouchTitle"><div id="pouchBox" class="slab">
-  <div class="head"><h2 id="pouchTitle">COIN POUCH</h2><button id="pouchClose" class="slab" aria-label="Close pouch">×</button></div>
+  <div class="head"><h2 id="pouchTitle">POUCH</h2><button id="pouchClose" class="slab" aria-label="Close pouch">×</button></div>
   <p class="note">Your dice decide how many coins flip. Every special coin you own plays in every press, at a random spot; plain coins fill the rest.</p>
   <div id="pouchList" style="display:grid;gap:10px"></div>
 </div></div>
@@ -270,8 +270,8 @@ const sfx={
 
 // ================= skins =================
 const SKINS={
-  dark:{bezel:'#f2eee6',rim:'#a8a2b8',bg:'#121216',dot:'rgba(242,238,230,.09)',tray:'#24242d',edge:'#f2eee6',hard:'#f2eee6',line:'#0b0b0f',obj:'#050507',tails:'#4b4b5c',mid:'#9b8cff',blank:'#8e8ea3',ink:'#f2eee6',hint:'#9a9aaa',bar:'#ff5ca8'},
-  light:{bezel:'#ffffff',rim:'#9fb3c8',bg:'#a5d8ff',dot:'rgba(17,17,17,.13)',tray:'#eef1f6',edge:'#111',hard:'#111',line:'#111',obj:'#111',tails:'#d5d5d5',mid:'#c9b6ff',blank:'#e4e4ea',ink:'#111',hint:'#666',bar:'#ff5ca8'}};
+  dark:{zone:'rgba(0,0,0,.34)',zoneEdge:'rgba(242,238,230,.16)',bezel:'#f2eee6',rim:'#a8a2b8',bg:'#121216',dot:'rgba(242,238,230,.09)',tray:'#24242d',edge:'#f2eee6',hard:'#f2eee6',line:'#0b0b0f',obj:'#050507',tails:'#4b4b5c',mid:'#9b8cff',blank:'#8e8ea3',ink:'#f2eee6',hint:'#9a9aaa',bar:'#ff5ca8'},
+  light:{zone:'rgba(17,17,17,.08)',zoneEdge:'rgba(17,17,17,.22)',bezel:'#ffffff',rim:'#9fb3c8',bg:'#a5d8ff',dot:'rgba(17,17,17,.13)',tray:'#eef1f6',edge:'#111',hard:'#111',line:'#111',obj:'#111',tails:'#d5d5d5',mid:'#c9b6ff',blank:'#e4e4ea',ink:'#111',hint:'#666',bar:'#ff5ca8'}};
 let skin='dark';try{skin=localStorage.getItem('oddsEngine.skin')==='light'?'light':'dark'}catch(e){}
 let th=SKINS[skin];
 
@@ -356,7 +356,7 @@ const world=new JuiceWorld();
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;let tA=0;const amb=()=>J&&!RM;
 const motes=Array.from({length:14},()=>({x:Math.random(),y:Math.random(),v:6+Math.random()*10,ph:Math.random()*6.28,r:1.5+Math.random()*2.5,k:Math.random()<.5}));
 const UI={k:1,st:0,hudY:48,barY:100,pipY:124};
-let W=0,H=0,dpr=1,playTop=130,playBot=400,coinTop=200,trayX=0,trayW=0;
+let zones=[],W=0,H=0,dpr=1,playTop=130,playBot=400,coinTop=200,trayX=0,trayW=0;
 let dice=[],coins=[],fading=[],events=[],T=0,busy=false,queued=false,holding=false,pending=null,J=true,lvlOpen=false,lvDelay=-1,offersNow=[];
 let ph={tot:0,heads:0,n:0,streak:0,lines:[],paid:[],miss:[]},tease=null;
 const TEASE=1.5;
@@ -389,10 +389,12 @@ function layout(first){
   UI.hudY=UI.st+Math.round(46*UI.k)+(W<520?4:0);UI.barY=UI.st+Math.round(100*UI.k);UI.pipY=UI.st+Math.round(128*UI.k);
   const uiH=ui.getBoundingClientRect().height;playTop=UI.st+Math.round(158*UI.k);playBot=H-uiH-30;trayW=Math.min(W-(W<520?20:28),660);trayX=W/2-trayW/2;
   hudJ.moveTo(W/2,UI.hudY);barJ.moveTo(W/2,UI.barY);if(first){hudJ.snap(W/2,UI.hudY);barJ.snap(W/2,UI.barY)}
-  const n=dice.length,avail=trayW-28;
-  let ds=n?Math.min(58*UI.k,avail/n/1.45):0;ds=Math.max(ds,26);
-  const gap=Math.min(ds*1.45,avail/Math.max(1,n)),dy=playTop+ds*.5+26;
-  dice.forEach((d,i)=>{d.size=ds;d.hx=W/2+(i-(n-1)/2)*gap;d.hy=dy;d.j.moveTo(d.hx,d.hy);if(first)d.j.snap(d.hx,d.hy)});
+  // dice sit in zones: one socket per randomizer slot, filled left to right, so free slots show without a label
+  const n=dice.length,z=n?Math.max(S.slots,n):0,avail=trayW-28;
+  let ds=z?Math.min(58*UI.k,avail/z/1.45):0;ds=Math.max(ds,26);
+  const gap=Math.min(ds*1.45,avail/Math.max(1,z)),dy=playTop+ds*.5+26;
+  zones=Array.from({length:z},(_,i)=>({x:W/2+(i-(z-1)/2)*gap,y:dy,w:Math.min(gap-6,ds*1.32),h:ds*1.34}));
+  dice.forEach((d,i)=>{d.size=ds;d.hx=W/2+(i-(z-1)/2)*gap;d.hy=dy;d.j.moveTo(d.hx,d.hy);if(first)d.j.snap(d.hx,d.hy)});
   coinTop=n?dy+ds*.6+22:playTop+14;
   const sl=coinSlots(Math.max(1,coins.length));
   coins.forEach((c,i)=>{const s=sl[i];c.tx=s.x;c.ty=s.y;c.r=s.r;if(!c.hidden)c.j.moveTo(s.x,s.y)});
@@ -667,7 +669,7 @@ function pick(p,swapIdx){
     if(swapIdx!==undefined){const d=dice[swapIdx];S.sides[swapIdx]=p.die;d.sides=p.die;d.face=p.die;d.j.pop();d.hl=1;sfx.land(true)}
     else{S.dice++;S.sides.push(p.die);addDie(true,p.die);layout();if(S.dice===1)clearCoins()}
   }else if(p.part){if(swapIdx!==undefined)S.parts[swapIdx]=p.part;else S.parts.push(p.part);S.left=budget();partJ(p.part).pop()
-  }else({boom:()=>{S.boom++},val:()=>{S.val++},luck:()=>{S.luck++},reflip:()=>{S.reflip++},slots:()=>{S.slots++},rebate:()=>{S.rebate++},lines:()=>{S.lineMult++},
+  }else({boom:()=>{S.boom++},val:()=>{S.val++},luck:()=>{S.luck++},reflip:()=>{S.reflip++},slots:()=>{S.slots++;layout()},rebate:()=>{S.rebate++},lines:()=>{S.lineMult++},
     poly:()=>{const m=Math.min(...S.sides),i=S.sides.indexOf(m),nx=SIDES[SIDES.indexOf(m)+1];S.sides[i]=nx;dice[i].sides=nx;dice[i].face=nx;dice[i].j.pop();dice[i].hl=1},
     loaded:()=>{S.minFace++},perf:()=>{S.perf++},sixes:()=>{S.sixes+=2},chain:()=>{S.chain++}})[p.id]();
   coins.forEach(c=>{c.j.punch(8);c.hl=1});dice.forEach(d=>{d.j.punch(8);d.hl=1});
@@ -813,6 +815,10 @@ function partHit(id,label){const j=partJ(id);j.punch(16).wobble(.5);sfx.ping();i
 function drawParts(){const n=S.parts.length;if(!n)return;const R=Math.round(13*Math.max(.85,UI.k)),gp=R*2+8,y=UI.pipY+R*.7;
   S.parts.forEach((id,i)=>{const j=partJ(id);j.moveTo(trayX+trayW-R-8-(n-1-i)*gp,y);const s=Math.max(0,j.s.x);
     ctx.save();ctx.translate(j.p.x.x,j.p.y.x);ctx.rotate(j.r.x);ctx.scale(s,s);drawPart(ctx,id,R,2.5);ctx.restore()})}
+// sunken sockets in the tray floor, one per slot; empty ones read as room for another die
+function drawZones(){zones.forEach((z,i)=>{const x=z.x-z.w/2,y=z.y-z.h/2+z.h*.04,r=z.w*.26,empty=i>=dice.length;
+  ctx.save();rr(ctx,x,y,z.w,z.h,r);ctx.fillStyle=th.zone;ctx.fill();ctx.clip();ctx.fillStyle=th.zone;ctx.fillRect(x,y,z.w,Math.max(5,z.h*.1));ctx.restore();
+  rr(ctx,x,y,z.w,z.h,r);ctx.lineWidth=2.5;ctx.strokeStyle=th.zoneEdge;if(empty)ctx.setLineDash([6,5]);ctx.stroke();ctx.setLineDash([])})}
 function drawBar(){
   const k=UI.k,g=need(),t=barJ.xf(),chip=Math.round(58*k),bw=Math.min(300*k,W-110),bh=Math.max(26,Math.round(32*k)),x0=-bw/2+chip/2+4,p=Math.min(1,score.shown/g),step=cycleIndex(),full=score.value>=g;
   ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);
@@ -842,7 +848,7 @@ function drawPips(){
   const cal=calibrating();if(cal){ctx.font='12px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=th.hint;ctx.fillText('FREE FLIPS',W/2,UI.pipY)}
   const n=cal?0:Math.max(budget(),S.left),sz=Math.round(16*Math.max(.85,UI.k)),gp=8,w=n*sz+(n-1)*gp,x0=W/2-w/2,y=UI.pipY;
   for(let i=0;i<n;i++){const on=cal?i<S.calib:i<S.left,x=x0+i*(sz+gp);if(amb()&&!cal&&i===S.left-1&&!busy){const k=1+Math.sin(tA*4)*.12;ctx.save();ctx.translate(x+sz/2,y+sz/2);ctx.scale(k,k);ctx.translate(-x-sz/2,-y-sz/2)}else ctx.save();chunkBox(ctx,x,y,sz,sz*.82,5,4,on?(cal?'#4cc9f0':S.left===1?'#ff4b3e':'#ffe14d'):th.tray,3,on?null:th.line);ctx.restore()}
-  if(dice.length){ctx.font='12px "Archivo Black", sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillStyle=th.hint;ctx.fillText(`SLOTS ${dice.length}/${S.slots}`,trayX+22,playTop+20)}
+
 }
 function draw(){
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -861,7 +867,7 @@ function draw(){
   ctx.save();ctx.clip();ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(trayX,playTop+bz,trayW,11);ctx.restore();
   rr(ctx,trayX+bz,playTop+bz,trayW-bz*2,TH-bz*2,18);ctx.lineWidth=4;ctx.strokeStyle=th.line;ctx.stroke();
   if(!S.presses){ctx.fillStyle=th.hint;ctx.font='700 14px "Space Grotesk", sans-serif';ctx.textAlign='center';ctx.fillText('tap FLIP and watch it play out',W/2,playBot-24)}
-  dice.forEach(drawDie);fading.forEach(drawCoin);coins.forEach(c=>{if(!tease||c!==tease.c)drawCoin(c)});drawLines();if(tease)drawCoin(tease.c);
+  drawZones();dice.forEach(drawDie);fading.forEach(drawCoin);coins.forEach(c=>{if(!tease||c!==tease.c)drawCoin(c)});drawLines();if(tease)drawCoin(tease.c);
   world.drawCoins(ctx);
   drawBar();drawPips();drawParts();
   drawSticker(ctx,hudJ,score.text,Math.min(56*UI.k,W/7));
@@ -901,7 +907,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126034644';let updShown=false,updDismissed='';
+const BUILD='20261126035704';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
