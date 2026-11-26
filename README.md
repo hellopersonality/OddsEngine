@@ -8,6 +8,9 @@ A juicy, neo-brutalist chance machine for the browser. One press sets the whole 
 - **Randomizers** (d6 to d20 dice) take up limited slots (5 to start). When full, a new die is swapped in for an old one.
 - **Paylines:** any straight run of 3+ coins in the layout counts: across, down or along either diagonal. All heads pays a multiplier. When a line is one coin away, the machine pauses for a tease.
 - **Coin pouch:** plain coins are unlimited; the pouch holds your special coins (golden, lead, wild, ember, magnet, crown), won from level-up cards. Every special you own plays exactly once per press at a random spot, and plain coins fill the rest. Specials that react to their neighbours resolve in an effects step after the flips.
+- **Mirror coin:** instead of flipping, it copies the coin its arrow points at (heads or tails, value and all) in the effects step.
+- **Exploding dice:** an upgrade where a max roll bursts and rolls again, adding to the coin count (up to 3 times in a row at max level).
+- **Machine parts:** rule-changers from level-up cards, 3 slots, swapped out when full. Cascade (paid lines drop away and refill), Lucky sevens (dice totals divisible by 7 pay ×2), Overclock (double coins, one fewer press), Echo chamber (first line pays double), Safety net (bottom-row tails flip again), Consolation (tails pay 1). They sit as hex nuts beside the press counters and punch when they fire; the pouch lists them.
 - **Press budget:** from level 2, every level gets 5 presses. Run out short of the goal and the run ends.
 
 ## Controls
