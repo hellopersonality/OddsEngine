@@ -486,6 +486,7 @@ let ciN=0;const i8=()=>(ciN=(ciN+3)%8);
 const BOOM=.6;
 // a die landed on its max with Exploding dice: it bursts, jumps and rolls again
 function explodeDie(d,v,k){
+  bpulse(d,'boom');
   d.rolling=false;d.face=v;d.hl=1;d.j.p.x.t=d.hx;d.j.punch(22).shove(420);sfx.land(true);sfx.boom(k);world.shake(.3+.08*k);hudJ.punch(4);
   if(J){world.burst(d.hx,d.hy,5+k*2);world.popText(k>1?'BOOM ×'+k+'!':'BOOM!',d.hx,d.hy-d.size*.95,{size:Math.max(24,d.size*.62),layers:2,kick:8,ci:1,life:.85});
     if(S.sixes)world.popText('+'+S.sixes,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
@@ -498,6 +499,7 @@ function landDie(d,v,mine,spill,seq=[v]){
   sfx.land(v===d.sides);world.shake(v===d.sides?.22:.13);
   if(seq.length>1&&J)world.popText('= '+tot,d.hx,d.hy+d.size*1.05,{size:Math.max(24,d.size*.6),layers:2,kick:7,ci:3,life:1.1});
   if(hasPart('overclock')){partJ('overclock').punch(8);if(J)world.popText('×2',d.hx-d.size*.65,d.hy+d.size*.2,{size:Math.max(18,d.size*.4),ci:1,life:.8})}
+  if(maxed&&S.sixes)bpulse(d,'sixes');if(S.minFace>1&&v<=S.minFace)bpulse(d,'loaded');
   if(maxed&&ph.refunds<S.rebate){ph.refunds++;S.left++;updateGoLabel();sfx.ping();if(J)world.popText('PRESS BACK!',d.hx,d.hy+d.size*.9,{size:24,ci:4,layers:2,life:1})}
   if(J){world.popText(String(v),d.hx+d.size*.55,d.hy-d.size*.55,{size:Math.max(22,d.size*.55),rise:14,ci:i8()});
     if(v===d.sides&&S.sixes&&seq.length===1)world.popText('+'+S.sixes,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
@@ -797,7 +799,8 @@ function drawDie(d){
   else{const txt=String(d.face);ctx.font=`${Math.round(s*(txt.length>1?.4:.5))}px "Archivo Black", Impact, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=top?'#ff4b3e':'#111';ctx.fillText(txt,0,d.sides===4?s*.12:s*.03)}
   ctx.restore();
-  if(!d.rolling&&d.sides!==6){ctx.font='11px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.fillStyle=th.hint;ctx.fillText('d'+d.sides,d.hx,d.hy+s*.86+4)}
+  drawBadges(d,t);
+  if(!d.rolling&&d.sides!==6){ctx.font='11px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.fillStyle=th.hint;ctx.fillText('d'+d.sides,d.hx,d.hy+s*.86+4+(S.boom||S.minFace>1||S.sixes?Math.max(8,s*.21)+2:0))}
 }
 function glyph(g,type,r,dir){
   g.fillStyle='#111';g.strokeStyle='#111';g.textAlign='center';g.textBaseline='middle';
@@ -856,6 +859,19 @@ function drawParts(){const n=S.parts.length;if(!n)return;const R=Math.round(13*M
 function drawZones(){zones.forEach((z,i)=>{const x=z.x-z.w/2,y=z.y-z.h/2+z.h*.04,r=z.w*.26,empty=i>=dice.length;
   ctx.save();rr(ctx,x,y,z.w,z.h,r);ctx.fillStyle=th.zone;ctx.fill();ctx.clip();ctx.fillStyle=th.zone;ctx.fillRect(x,y,z.w,Math.max(5,z.h*.1));ctx.restore();
   rr(ctx,x,y,z.w,z.h,r);ctx.lineWidth=2.5;ctx.strokeStyle=th.zoneEdge;if(empty)ctx.setLineDash([6,5]);ctx.stroke();ctx.setLineDash([])})}
+// perk badges on every die: a row of little stickers under it, one per die-changing perk; they pulse when the perk fires
+const bpulse=(d,k)=>{(d.bp||(d.bp={}))[k]=1};
+function drawBadges(d,t){
+  const list=[];if(S.boom)list.push('boom');if(S.minFace>1)list.push('loaded');if(S.sixes)list.push('sixes');if(!list.length||t.s<.05)return;
+  const s=d.size,R=Math.max(8,s*.21);
+  list.forEach((k,i)=>{const p=(d.bp&&d.bp[k])||0,sc=t.s*(1+.6*p*p),x=t.x+(i-(list.length-1)/2)*(R*2+3),y=t.y+s*.66;
+    ctx.save();ctx.translate(x,y);ctx.scale(sc,sc);ctx.lineWidth=Math.max(2,R*.24);ctx.strokeStyle=th.line;ctx.lineJoin='round';
+    if(k==='boom'){ctx.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8-Math.PI/2,q=i%2?R*.7:R*1.15;ctx.lineTo(Math.cos(a)*q,Math.sin(a)*q)}ctx.closePath();ctx.fillStyle='#ff9f1c';ctx.fill();ctx.stroke()}
+    else{ctx.beginPath();ctx.arc(0,0,R,0,7);ctx.fillStyle=k==='loaded'?'#a9b4c4':'#3ddc97';ctx.fill();ctx.stroke()}
+    const txt=k==='boom'?(S.boom>1?String(S.boom):''):k==='loaded'?'≥'+S.minFace:'+'+S.sixes;
+    if(txt){ctx.fillStyle='#111';ctx.font=`${Math.round(R*(txt.length>1?.95:1.15))}px "Archivo Black", sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,0,R*.06)}
+    ctx.restore()});
+}
 function drawBar(){
   const k=UI.k,g=need(),t=barJ.xf(),chip=Math.round(58*k),bw=Math.min(300*k,W-110),bh=Math.max(26,Math.round(32*k)),x0=-bw/2+chip/2+4,p=Math.min(1,score.shown/g),step=cycleIndex(),full=score.value>=g;
   ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);
@@ -916,7 +932,7 @@ let last=performance.now();
 function frame(now){
   const raw=Math.min(.05,(now-last)/1000);last=now;const dt=raw*cfg.timeScale;T+=dt;
   for(let guard=0;guard<8;guard++){const due=events.filter(e=>e.t<=T);if(!due.length)break;events=events.filter(e=>e.t>T);due.sort((a,b)=>a.t-b.t).forEach(e=>e.fn())}
-  dice.forEach(d=>{if(d.rolling){const p=Math.min(1,(T-d.t0)/d.lt);d.spin=(d.spin||0)+dt*(1-p)*22;d.ft-=dt;if(d.ft<=0){d.ft=.04+p*p*.16;d.face=anyFace(d);sfx.tumble(p)}}else d.spin=0;d.hl=Math.max(0,d.hl-dt*1.8)});
+  dice.forEach(d=>{if(d.rolling){const p=Math.min(1,(T-d.t0)/d.lt);d.spin=(d.spin||0)+dt*(1-p)*22;d.ft-=dt;if(d.ft<=0){d.ft=.04+p*p*.16;d.face=anyFace(d);sfx.tumble(p)}}else d.spin=0;d.hl=Math.max(0,d.hl-dt*1.8);if(d.bp)for(const k in d.bp)d.bp[k]=Math.max(0,d.bp[k]-dt*2.2)});
   coins.forEach(c=>c.hl=Math.max(0,c.hl-dt*1.4));stepReels();
   tA+=raw;
   if(amb()){
@@ -944,7 +960,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126040433';let updShown=false,updDismissed='';
+const BUILD='20261126040918';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
