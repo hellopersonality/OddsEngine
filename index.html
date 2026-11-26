@@ -121,7 +121,7 @@ button{font:inherit;color:var(--ink)}
 <button id="pouchBtn" class="slab" aria-haspopup="dialog">Pouch</button>
 <div id="pouchDlg" role="dialog" aria-modal="true" aria-labelledby="pouchTitle"><div id="pouchBox" class="slab">
   <div class="head"><h2 id="pouchTitle">POUCH</h2><button id="pouchClose" class="slab" aria-label="Close pouch">×</button></div>
-  <p class="note">Your dice decide how many coins flip. Every special coin you own plays in every press, at a random spot; plain coins fill the rest.</p>
+  <p class="note">Your dice decide how many coins flip. Every special coin you own plays in every press, at a random spot, as long as the dice give enough coins (if not, a random handful play). Plain coins fill the rest.</p>
   <div id="pouchList" style="display:grid;gap:10px"></div>
 </div></div>
 <div id="ui"><button id="go" class="slab bright"><span id="goLbl">FLIP</span><small id="goLeft"></small></button></div>
@@ -420,7 +420,8 @@ function resetTray(){
   else coins.forEach(c=>{c.face=null;c.dim=0;c.hl=0;c.j.punch(5)});
   dice.forEach(d=>d.hl=0);
 }
-function setBusy(v){busy=v;refreshGo()}
+let updPending=false;
+function setBusy(v){busy=v;refreshGo();if(!v&&updPending){updPending=false;setTimeout(doUpdate,300)}}
 // the button only exists while it can actually be pressed
 let goHidden=false,over=false,overDelay=-1;
 // shrink single-line text until it fits its box (big numbers on small phones)
@@ -440,7 +441,7 @@ function press(){
   if(lvlOpen||lvDelay>=0||busy)return;
   audio();
   if(score.value>=need()||(!calibrating()&&S.left<=0))return;
-  setBusy(true);S.presses++;if(calibrating())S.calib++;else S.left--;updateGoLabel();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;
+  setBusy(true);S.presses++;if(calibrating())S.calib++;else S.left--;updateGoLabel();save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;
   sfx.press();go.classList.remove('hit');void go.offsetWidth;go.classList.add('hit');
   if(!dice.length){
     let c=coins[0];
@@ -932,7 +933,7 @@ function draw(){
 }
 
 // ================= loop =================
-let last=performance.now();
+let last=performance.now(),lastPal=null;
 function frame(now){
   const raw=Math.min(.05,(now-last)/1000);last=now;const dt=raw*cfg.timeScale;T+=dt;
   for(let guard=0;guard<8;guard++){const due=events.filter(e=>e.t<=T);if(!due.length)break;events=events.filter(e=>e.t>T);due.sort((a,b)=>a.t-b.t).forEach(e=>e.fn())}
@@ -957,21 +958,22 @@ function frame(now){
   if(lvDelay>=0){lvDelay-=raw;if(lvDelay<0)openLevel()}
   refreshGo();
   draw();
-  const ci=cycleIndex(),rs=document.documentElement.style;rs.setProperty('--pal',J?pal(ci):'#ffe14d');rs.setProperty('--pal2',J?pal(ci+3):'#4cc9f0');
+  const ci=cycleIndex(),pk=J?ci:-1;if(pk!==lastPal){lastPal=pk;const rs=document.documentElement.style;rs.setProperty('--pal',J?pal(ci):'#ffe14d');rs.setProperty('--pal2',J?pal(ci+3):'#4cc9f0')}
   requestAnimationFrame(frame);
 }
 
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126041351';let updShown=false,updDismissed='';
+const BUILD='20261126042619';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
     if(v&&v.build&&v.build!==BUILD&&v.build!==updDismissed){updShown=v.build;showUpd()}}catch(e){}
 }
 function showUpd(){if(busy||lvlOpen||over){setTimeout(showUpd,1500);return}$('#upd').classList.add('open');sfx.ping()}
-$('#updGo').addEventListener('click',()=>{save();const u=new URL(location.href);u.searchParams.set('v',updShown||Date.now());location.replace(u.toString())});
+function doUpdate(){save();const u=new URL(location.href);u.searchParams.set('v',updShown||Date.now());location.replace(u.toString())}
+$('#updGo').addEventListener('click',()=>{$('#upd').classList.remove('open');if(busy){updPending=true;return}doUpdate()});
 $('#updLater').addEventListener('click',()=>{updDismissed=updShown;$('#upd').classList.remove('open')});
 setTimeout(checkUpdate,4000);setInterval(checkUpdate,120000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
@@ -990,7 +992,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyP'&&!lvlOpen&&!over){openPouch();return}
   if(over){if(e.code==='Enter'||e.code==='Space'){e.preventDefault();newRun()}return}
   if(lvlOpen){const i={Digit1:0,Digit2:1,Digit3:2}[e.code];if(i!==undefined&&offersNow[i])pick(offersNow[i]);if(e.code==='KeyR')rerollBtn.click();return}
-  if(e.code==='Space'||e.code==='Enter'){if(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#opt'))return;e.preventDefault();if(!e.repeat){go.classList.add('down');press()}}});
+  if(e.code==='Space'||e.code==='Enter'){const ae=document.activeElement;if(ae&&ae!==go&&ae.tagName==='BUTTON')return;e.preventDefault();if(!e.repeat){go.classList.add('down');press()}}});
 addEventListener('keyup',e=>{if(e.code==='Space'||e.code==='Enter')release()});
 addEventListener('blur',release);
 const tog=(el,on)=>el.setAttribute('aria-pressed',on?'true':'false');
@@ -1001,7 +1003,7 @@ $('#tSound').addEventListener('click',e=>{sound=!sound;tog(e.currentTarget,sound
 function applySkin(){th=SKINS[skin];document.documentElement.dataset.skin=skin;$('#tSkin').setAttribute('aria-pressed',skin==='light'?'true':'false');try{localStorage.setItem('oddsEngine.skin',skin)}catch(e){}}
 $('#tSkin').addEventListener('click',()=>{skin=skin==='dark'?'light':'dark';applySkin()});
 applySkin();
-let resetArm=0;
+let resetArm=-1e9;
 $('#tReset').addEventListener('click',e=>{const b=e.currentTarget;if(performance.now()-resetArm>2500){resetArm=performance.now();b.textContent='Tap again to reset';return}
   b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   lvlOpen=false;lvDelay=-1;lvlEl.classList.remove('open');over=false;overDelay=-1;$('#over').classList.remove('open');
