@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Odds Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -20,8 +20,13 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 button{font:inherit;color:var(--ink)}
 .slab{border:3px solid var(--edge);border-radius:10px;box-shadow:5px 5px 0 var(--hard);background:var(--surf);color:var(--ink)}
 .bright{border-color:var(--line);color:#111}
-#ui{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;padding:10px 14px calc(16px + env(safe-area-inset-bottom))}
-#go{width:100%;height:80px;font:38px/1 "Archivo Black",Impact,sans-serif;letter-spacing:.02em;background:var(--yellow);cursor:pointer;transition:translate .32s cubic-bezier(.3,1.5,.5,1),opacity .18s,transform .05s,box-shadow .05s}
+#ui{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;padding:8px max(14px,env(safe-area-inset-left)) calc(12px + env(safe-area-inset-bottom))}
+#probe{position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+@media(max-width:420px){#pouchBtn,.tog{min-height:34px;padding:5px 10px;font-size:12px}}
+#upd{position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top));z-index:8;display:none;align-items:center;gap:10px;padding:8px 8px 8px 14px;translate:-50% 0;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:5px 5px 0 var(--accent);animation:slam .4s cubic-bezier(.2,1.7,.4,1)}
+#upd.open{display:flex}#upd button{min-height:36px;padding:4px 12px;font-weight:700;cursor:pointer;box-shadow:2px 2px 0 var(--hard)}
+#updGo{background:var(--yellow)}
+#go{width:100%;height:clamp(60px,10svh,80px);font:clamp(28px,8.6vw,38px)/1 "Archivo Black",Impact,sans-serif;letter-spacing:.02em;background:var(--yellow);cursor:pointer;transition:translate .32s cubic-bezier(.3,1.5,.5,1),opacity .18s,transform .05s,box-shadow .05s}
 #go:active,#go.down{transform:translate(4px,4px);box-shadow:1px 1px 0 var(--hard)}
 #go.hit{animation:hit .2s}
 #go{display:grid;place-content:center;gap:4px}
@@ -43,7 +48,7 @@ button{font:inherit;color:var(--ink)}
 @keyframes ready{40%{scale:1.05 1.1}}
 @keyframes hit{35%{scale:1.03 .92}70%{scale:.99 1.04}}
 :focus-visible{outline:3px dashed var(--ink);outline-offset:4px}
-#pouchBtn{position:fixed;top:12px;left:12px;z-index:3;min-height:38px;padding:6px 12px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:3px 3px 0 var(--hard)}
+#pouchBtn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));z-index:3;min-height:38px;padding:6px 12px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:3px 3px 0 var(--hard)}
 #pouchBtn.bump{animation:hit .3s}
 #pouchDlg{position:fixed;inset:0;z-index:6;display:none;place-items:center;padding:14px;background:rgba(10,10,12,.8)}#pouchDlg.open{display:grid}
 #pouchBox{width:100%;max-width:520px;max-height:90vh;overflow:auto;padding:18px;display:grid;gap:12px;box-shadow:8px 8px 0 var(--accent)}
@@ -51,7 +56,7 @@ button{font:inherit;color:var(--ink)}
 .prow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 10px}
 .prow canvas{position:static;width:44px;height:44px}.prow b{display:block;font:16px/1.15 "Archivo Black",sans-serif}.prow small{color:var(--muted);font-size:14px}
 .prow .n{font:22px/1 "Archivo Black",sans-serif}
-#opt{position:fixed;top:12px;right:12px;display:grid;justify-items:end;gap:8px;z-index:3}
+#opt{position:fixed;top:calc(10px + env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));display:grid;justify-items:end;gap:8px;z-index:3}
 .tog{min-height:38px;padding:6px 12px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:3px 3px 0 var(--hard)}
 .tog[aria-pressed=false]{opacity:.55}
 #panel{display:none;gap:8px;justify-items:end}#panel.open{display:grid}
@@ -98,6 +103,8 @@ button{font:inherit;color:var(--ink)}
 </head>
 <body>
 <canvas id="cv" aria-label="Coin and dice tray"></canvas>
+<div id="probe"></div>
+<div id="upd" class="slab" role="status"><span>New version ready</span><button id="updGo" class="slab bright">Update</button><button id="updLater" class="slab" aria-label="Dismiss">Later</button></div>
 <div id="opt">
   <button class="tog slab" id="optBtn" aria-expanded="false">Options</button>
   <div id="panel">
@@ -329,10 +336,17 @@ function drawOffers(){
 const world=new JuiceWorld();
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;let tA=0;const amb=()=>J&&!RM;
 const motes=Array.from({length:14},()=>({x:Math.random(),y:Math.random(),v:6+Math.random()*10,ph:Math.random()*6.28,r:1.5+Math.random()*2.5,k:Math.random()<.5}));
+const UI={k:1,st:0,hudY:48,barY:100,pipY:124};
 let W=0,H=0,dpr=1,playTop=130,playBot=400,coinTop=200,trayX=0,trayW=0;
 let dice=[],coins=[],fading=[],events=[],T=0,busy=false,queued=false,holding=false,pending=null,J=true,lvlOpen=false,lvDelay=-1,offersNow=[];
 let ph={tot:0,heads:0,n:0,streak:0,lines:[],paid:[],miss:[]},tease=null;
 const TEASE=1.5;
+// every pop-up is shrunk to fit and nudged inside the screen edges, so no text ever clips on narrow phones
+{const _pop=world.popText.bind(world);world.popText=(text,x,y,o={})=>{
+  let size=(o.size??44)*Math.min(1,UI.k*1.08);ctx.font=`${size}px "Archivo Black", Impact, sans-serif`;
+  const pad=size*.3+(o.layers||1)*cfg.offset*size/44+6;let w=ctx.measureText(text).width+pad;const maxW=W-20;
+  if(w>maxW){size*=maxW/w;w=maxW}x=Math.max(10+w/2,Math.min(W-10-w/2,x));y=Math.max(UI.st+size*.7,y);
+  return _pop(text,x,y,{...o,size})}}
 const hudJ=world.add(new Juicy(200,46,{sk:500,sz:.3}));
 const barJ=world.add(new Juicy(200,98,{sk:500,sz:.35}));
 const at=(t,fn)=>events.push({t,fn});
@@ -343,17 +357,21 @@ S.sides.forEach(v=>addDie(false,v));
 function coinSlots(n){
   const top=coinTop,bot=playBot-10,w=trayW-28,h=Math.max(60,bot-top);let best=null;
   for(let cols=1;cols<=n;cols++){const rows=Math.ceil(n/cols),cell=Math.min(w/cols,h/rows);if(!best||cell>best.cell)best={cols,rows,cell}}
-  const{cols,rows,cell}=best,r=Math.min(n===1?64:46,cell*.38),out=[];
+  const{cols,rows,cell}=best,r=Math.min((n===1?64:46)*UI.k,cell*.38),out=[];
   for(let i=0;i<n;i++){const row=Math.floor(i/cols),rc=row===rows-1?n-row*cols:cols,col=i%cols+Math.floor((cols-rc)/2);
     out.push({x:W/2+(col-(cols-1)/2)*cell,y:top+h/2+(row-(rows-1)/2)*cell,r,row,col,cell})}
   out.cols=cols;out.rows=rows;return out;
 }
 function layout(first){
   W=innerWidth;H=innerHeight;dpr=Math.min(2,devicePixelRatio||1);cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
-  const uiH=ui.getBoundingClientRect().height;playTop=148;playBot=H-uiH-14;trayW=Math.min(W-28,660);trayX=W/2-trayW/2;
-  hudJ.moveTo(W/2,48);barJ.moveTo(W/2,100);if(first){hudJ.snap(W/2,48);barJ.snap(W/2,100)}
+  // scale the HUD to the device: phones get a tighter, smaller header; notches/home bars are respected
+  const pr=getComputedStyle($('#probe'));UI.st=parseFloat(pr.paddingTop)||0;
+  UI.k=Math.max(.74,Math.min(1.12,Math.min(W/430,(H-UI.st)/880)));
+  UI.hudY=UI.st+Math.round(46*UI.k)+(W<520?4:0);UI.barY=UI.st+Math.round(102*UI.k);UI.pipY=UI.st+Math.round(121*UI.k);
+  const uiH=ui.getBoundingClientRect().height;playTop=UI.st+Math.round(143*UI.k);playBot=H-uiH-12;trayW=Math.min(W-(W<520?20:28),660);trayX=W/2-trayW/2;
+  hudJ.moveTo(W/2,UI.hudY);barJ.moveTo(W/2,UI.barY);if(first){hudJ.snap(W/2,UI.hudY);barJ.snap(W/2,UI.barY)}
   const n=dice.length,avail=trayW-28;
-  let ds=n?Math.min(58,avail/n/1.45):0;ds=Math.max(ds,26);
+  let ds=n?Math.min(58*UI.k,avail/n/1.45):0;ds=Math.max(ds,26);
   const gap=Math.min(ds*1.45,avail/Math.max(1,n)),dy=playTop+ds*.5+20;
   dice.forEach((d,i)=>{d.size=ds;d.hx=W/2+(i-(n-1)/2)*gap;d.hy=dy;d.j.moveTo(d.hx,d.hy);if(first)d.j.snap(d.hx,d.hy)});
   coinTop=n?dy+ds*.6+14:playTop+10;
@@ -608,7 +626,7 @@ function dieIcon(c,n,size){const g=c.getContext('2d');c.width=c.height=size*2;g.
   g.fillStyle='#111';g.font=`${Math.round(size*.26)}px "Archivo Black", sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText(n===6?'6':String(n),0,n===4?size*.07:2)}
 $('#again').addEventListener('click',newRun);
 const pouchBtn=$('#pouchBtn'),pouchDlg=$('#pouchDlg');
-function pouchLabel(){return S.pouch.length?`Pouch · ${S.pouch.length} special`:'Pouch'}
+function pouchLabel(){return S.pouch.length?(innerWidth<420?`Pouch · ${S.pouch.length}`:`Pouch · ${S.pouch.length} special`):'Pouch'}
 function pouchBump(){pouchBtn.textContent=pouchLabel();pouchBtn.classList.remove('bump');void pouchBtn.offsetWidth;pouchBtn.classList.add('bump')}
 function openPouch(){const L=$('#pouchList');L.innerHTML='';
   ['plain',...Object.keys(COINS).filter(t=>t!=='plain'&&countOf(t))].forEach(t=>{const row=document.createElement('div');row.className='prow slab';const cv_=document.createElement('canvas');coinIcon(cv_,t,44);
@@ -676,12 +694,12 @@ function drawCoin(c){
   ctx.restore();
 }
 function drawBar(){
-  const g=need(),t=barJ.xf(),chip=58,bw=Math.min(300,W-130),bh=26,x0=-bw/2+chip/2+4,p=Math.min(1,score.shown/g),step=cycleIndex(),full=score.value>=g;
+  const k=UI.k,g=need(),t=barJ.xf(),chip=Math.round(58*k),bw=Math.min(300*k,W-110),bh=Math.max(22,Math.round(26*k)),x0=-bw/2+chip/2+4,p=Math.min(1,score.shown/g),step=cycleIndex(),full=score.value>=g;
   ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);
   const bx=-bw/2+chip+8,bW=bw-chip-8;
   ctx.fillStyle=th.hard;rr(ctx,-bw/2+4,-bh/2+4,chip,bh,7);ctx.fill();rr(ctx,bx+4,-bh/2+4,bW,bh,7);ctx.fill();
   ctx.fillStyle=J?pal(step+4):'#3ddc97';rr(ctx,-bw/2,-bh/2,chip,bh,7);ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=th.line;ctx.stroke();
-  ctx.fillStyle='#111';ctx.font='14px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('LV '+S.lv,-bw/2+chip/2,1);
+  ctx.fillStyle='#111';ctx.font=`${Math.max(12,Math.round(14*k))}px "Archivo Black", sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('LV '+S.lv,-bw/2+chip/2,1);
   ctx.fillStyle=th.tray;rr(ctx,bx,-bh/2,bW,bh,7);ctx.fill();
   ctx.save();rr(ctx,bx,-bh/2,bW,bh,7);ctx.clip();ctx.fillStyle=full&&J?pal(step):th.bar;ctx.fillRect(bx,-bh/2,bW*p,bh);
   if(amb()&&p>0){const ph=(tA%4)/1.3,sx=bx-30+ph*(bW*p+60);if(ph<=1){ctx.globalAlpha=.22;ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(sx,-bh/2);ctx.lineTo(sx+14,-bh/2);ctx.lineTo(sx+4,bh/2);ctx.lineTo(sx-10,bh/2);ctx.closePath();ctx.fill();ctx.globalAlpha=1}}
@@ -701,8 +719,8 @@ function drawLines(){
   ph.miss.forEach(p=>{const age=T-p.t;if(age>1.2)return;ctx.save();ctx.globalAlpha=Math.max(0,1-age/1.2)*.8;seg(p.l,Math.max(5,p.l.cs[0].r*.25),'#ff4b3e',[2,14]);ctx.restore()});
 }
 function drawPips(){
-  const cal=calibrating();if(cal){ctx.font='12px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=th.hint;ctx.fillText('FREE FLIPS',W/2,124)}
-  const n=cal?0:Math.max(budget(),S.left),sz=12,gp=6,w=n*sz+(n-1)*gp,x0=W/2-w/2,y=124;
+  const cal=calibrating();if(cal){ctx.font='12px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillStyle=th.hint;ctx.fillText('FREE FLIPS',W/2,UI.pipY)}
+  const n=cal?0:Math.max(budget(),S.left),sz=Math.round(12*Math.max(.85,UI.k)),gp=6,w=n*sz+(n-1)*gp,x0=W/2-w/2,y=UI.pipY;
   for(let i=0;i<n;i++){const on=cal?i<S.calib:i<S.left,x=x0+i*(sz+gp);if(amb()&&!cal&&i===S.left-1&&!busy){const k=1+Math.sin(tA*4)*.12;ctx.save();ctx.translate(x+sz/2,y+sz/2);ctx.scale(k,k);ctx.translate(-x-sz/2,-y-sz/2)}else ctx.save();ctx.fillStyle=th.hard;rr(ctx,x+2,y+2,sz,sz,3);ctx.fill();
     ctx.fillStyle=on?(cal?'#4cc9f0':S.left===1?'#ff4b3e':'#ffe14d'):th.tray;rr(ctx,x,y,sz,sz,3);ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=on?th.line:th.edge;ctx.stroke();ctx.restore()}
   if(dice.length){ctx.font='12px "Archivo Black", sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillStyle=th.hint;ctx.fillText(`SLOTS ${dice.length}/${S.slots}`,trayX+12,playTop+10)}
@@ -724,7 +742,7 @@ function draw(){
   dice.forEach(drawDie);fading.forEach(drawCoin);coins.forEach(c=>{if(!tease||c!==tease.c)drawCoin(c)});drawLines();if(tease)drawCoin(tease.c);
   world.drawCoins(ctx);
   drawBar();drawPips();
-  drawSticker(ctx,hudJ,score.text,Math.min(56,W/7));
+  drawSticker(ctx,hudJ,score.text,Math.min(56*UI.k,W/7));
   world.drawPops(ctx);
 }
 
@@ -737,7 +755,7 @@ function frame(now){
   coins.forEach(c=>c.hl=Math.max(0,c.hl-dt*1.4));
   tA+=raw;
   if(amb()){
-    hudJ.p.y.t=48+Math.sin(tA*1.3)*2.2;hudJ.r.t=Math.sin(tA*.8)*.025;barJ.p.y.t=100+Math.sin(tA*1.3-.9)*1.4;
+    hudJ.p.y.t=UI.hudY+Math.sin(tA*1.3)*2.2;hudJ.r.t=Math.sin(tA*.8)*.025;barJ.p.y.t=UI.barY+Math.sin(tA*1.3-.9)*1.4;
     dice.forEach((d,i)=>{if(!d.rolling&&Math.abs(d.j.p.x.x-d.hx)<6){d.j.p.y.t=d.hy+Math.sin(tA*1.7+i*1.3)*2.2;d.j.r.t=Math.sin(tA*1.05+i*.9)*.05}});
     coins.forEach((c,i)=>{if(!c.flipping&&!c.hidden&&!c.tease&&!(tease&&tease.c===c)&&!busy){c.j.p.y.t=c.ty+Math.sin(tA*2.1+i*.7)*1.6}});
   }else{hudJ.r.t=0;dice.forEach(d=>{if(!d.rolling)d.j.r.t=0})}
@@ -757,6 +775,21 @@ function frame(now){
   const ci=cycleIndex(),rs=document.documentElement.style;rs.setProperty('--pal',J?pal(ci):'#ffe14d');rs.setProperty('--pal2',J?pal(ci+3):'#4cc9f0');
   requestAnimationFrame(frame);
 }
+
+// ================= update check =================
+// The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
+// offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
+const BUILD='20261126024432';let updShown=false,updDismissed='';
+async function checkUpdate(){
+  if(location.protocol==='file:')return;
+  try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
+    if(v&&v.build&&v.build!==BUILD&&v.build!==updDismissed){updShown=v.build;showUpd()}}catch(e){}
+}
+function showUpd(){if(busy||lvlOpen||over){setTimeout(showUpd,1500);return}$('#upd').classList.add('open');sfx.ping()}
+$('#updGo').addEventListener('click',()=>{save();const u=new URL(location.href);u.searchParams.set('v',updShown||Date.now());location.replace(u.toString())});
+$('#updLater').addEventListener('click',()=>{updDismissed=updShown;$('#upd').classList.remove('open')});
+setTimeout(checkUpdate,4000);setInterval(checkUpdate,120000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
 
 // ================= input =================
 // let one-shot animations finish, then hand back to the idle loop

@@ -17,3 +17,6 @@ A juicy, neo-brutalist chance machine for the browser. One press sets the whole 
 
 ## Running it
 It's a single self-contained `index.html` with no build step. Open it in a browser, or serve it with GitHub Pages.
+
+## Updates
+`version.json` holds the current build id, and the same id is baked into `index.html`. An open game checks `version.json` every couple of minutes (and when the tab comes back to the foreground). When the ids differ, it offers a one-tap **Update**. Run `./bump.sh` before each commit that changes the game, so both get a fresh id.
