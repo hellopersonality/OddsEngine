@@ -298,6 +298,7 @@ const PARTS={
   cascade:{name:'Cascade',r:2,col:'#4cc9f0',desc:'When a line pays, its coins drop away and fresh coins fall in and flip (up to 3 times a press)'},
   sevens:{name:'Lucky sevens',r:1,col:'#ff5ca8',desc:'If your dice add up to a multiple of 7, the whole press pays ×2'},
   overclock:{name:'Overclock',r:1,col:'#ff4b3e',desc:'Dice spill twice the coins, but you get 1 fewer press per level'},
+  reels:{name:'Slot reels',r:2,col:'#ffe14d',desc:'When two dice match, the board spins like a slot machine after the flips, column by column, and any new lines pay'},
   echo:{name:'Echo chamber',r:1,col:'#c39bff',desc:'The first line every press pays double'},
   net:{name:'Safety net',r:0,col:'#3ddc97',desc:'Tails in the bottom row flip once more'}};
 const PSLOTS=3;
@@ -358,7 +359,7 @@ const motes=Array.from({length:14},()=>({x:Math.random(),y:Math.random(),v:6+Mat
 const UI={k:1,st:0,hudY:48,barY:100,pipY:124};
 let zones=[],W=0,H=0,dpr=1,playTop=130,playBot=400,coinTop=200,trayX=0,trayW=0;
 let dice=[],coins=[],fading=[],events=[],T=0,busy=false,queued=false,holding=false,pending=null,J=true,lvlOpen=false,lvDelay=-1,offersNow=[];
-let ph={tot:0,heads:0,n:0,streak:0,lines:[],paid:[],miss:[]},tease=null;
+let ph={tot:0,heads:0,n:0,streak:0,lines:[],paid:[],miss:[],paidKeys:new Set()},tease=null,reels=null,coinId=0,reelTick=0;
 const TEASE=1.5;
 // every pop-up is shrunk to fit and nudged inside the screen edges, so no text ever clips on narrow phones
 {const _pop=world.popText.bind(world);world.popText=(text,x,y,o={})=>{
@@ -403,7 +404,7 @@ function layout(first){
 function updateGoLabel(){const n=dice.length,l=S.left,c=calibrating();$('#goLbl').textContent=(!c&&l===1?'LAST ':'')+(n?'ROLL':'FLIP');
   $('#goLeft').textContent=c?'free flips this level':l===1?'final press this level':`${l} presses left`;go.classList.toggle('last',!c&&l===1)}
 function makeCoin(x,y,s,hidden){const j=world.add(new Juicy(x,y,{from:0,k:430,z:.55}));if(hidden)j.s.t=0;else j.pop();
-  return{j,r:s.r,tx:s.x,ty:s.y,face:null,res:null,gold:false,flipping:false,t0:0,dur:FLIP,dim:0,hl:0,hidden}}
+  return{id:++coinId,j,r:s.r,tx:s.x,ty:s.y,face:null,res:null,gold:false,flipping:false,t0:0,dur:FLIP,dim:0,hl:0,hidden}}
 function spawnCoin(c){c.hidden=false;c.j.s.t=1;c.j.s.v+=8;c.j.moveTo(c.tx,c.ty);c.j.wobble(.45)}
 function clearCoins(){coins.forEach(c=>{c.j.hide();fading.push(c)});coins=[]}
 const roll=d=>{const lo=Math.min(S.minFace,d.sides);return lo+Math.floor(Math.random()*(d.sides-lo+1))};
@@ -439,7 +440,7 @@ function press(){
   if(lvlOpen||lvDelay>=0||busy)return;
   audio();
   if(score.value>=need()||(!calibrating()&&S.left<=0))return;
-  setBusy(true);S.presses++;if(calibrating())S.calib++;else S.left--;updateGoLabel();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false};events=[];T=0;
+  setBusy(true);S.presses++;if(calibrating())S.calib++;else S.left--;updateGoLabel();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;
   sfx.press();go.classList.remove('hit');void go.offsetWidth;go.classList.add('hit');
   if(!dice.length){
     let c=coins[0];
@@ -451,7 +452,7 @@ function press(){
     // exploding dice: a max roll rolls again and adds, up to S.boom extra rolls
     const seqs=dice.map(d=>{const q=[roll(d)];while(q.length<=S.boom&&q[q.length-1]===d.sides)q.push(roll(d));return q}),rolls=seqs.map(q=>q[q.length-1]),
       oc=hasPart('overclock')?2:1,counts=seqs.map((q,i)=>(q.reduce((a,b)=>a+b,0)+q.filter(v=>v===dice[i].sides).length*S.sixes)*oc),n=counts.reduce((a,b)=>a+b,0);ph.n=ph.left=n;
-    const sum=seqs.reduce((a,q)=>a+q.reduce((x,y)=>x+y,0),0);ph.seven=hasPart('sevens')&&sum>0&&sum%7===0;ph.sum=sum;
+    const sum=seqs.reduce((a,q)=>a+q.reduce((x,y)=>x+y,0),0);ph.seven=hasPart('sevens')&&sum>0&&sum%7===0;ph.sum=sum;ph.reelTrig=hasPart('reels')&&new Set(rolls).size<rolls.length;
     const sl=coinSlots(n);let g=0;
     const types=drawPouch(n);
     const per=dice.map((d,i)=>{const mine=[];for(let k=0;k<counts[i];k++){const s_=sl[g],c=makeCoin(d.hx,d.hy,s_,true);c.cell=s_.cell;c.type=types[g++];c.res=resFor(c.type);coins.push(c);mine.push(c)}return mine});
@@ -504,8 +505,9 @@ function landDie(d,v,mine,spill,seq=[v]){
 }
 // paylines: full rows (3+), full columns and the two diagonals of the complete part of the grid
 // paylines follow the actual layout: every straight run of 3+ coins across, down or along either diagonal
-function buildLines(sl){
-  const n=coins.length,L=[];coins.forEach((c,i)=>{c.row=sl[i].row;c.col=sl[i].col;c.lines=[]});if(n<3)return;
+function buildLines(sl){coins.forEach((c,i)=>{c.row=sl[i].row;c.col=sl[i].col});makeLines()}
+function makeLines(){
+  const n=coins.length,L=[];coins.forEach(c=>{c.lines=[]});ph.lines=[];if(n<3)return;
   const grid=new Map(coins.map(c=>[c.row+','+c.col,c])),get=(r,c)=>grid.get(r+','+c);
   for(const[dr,dc]of[[0,1],[1,0],[1,1],[1,-1]])coins.forEach(c=>{
     if(get(c.row-dr,c.col-dc))return;            // only start at the beginning of a run
@@ -532,7 +534,7 @@ function startFlip(c,tz){
   c.j.punch(5);sfx.flip();at(T+c.dur,()=>resolveCoin(c));
 }
 function payLine(l){
-  l.paid=true;ph.paid.push({l,t:T});const sum=l.cs.reduce((a,o)=>a+(o.val||0),0);let bonus=sum*(S.lineMult-1);
+  l.paid=true;ph.paid.push({l,t:T});ph.paidKeys.add(lineKey(l.cs));const sum=l.cs.reduce((a,o)=>a+(o.val||0),0);let bonus=sum*(S.lineMult-1);
   if(hasPart('echo')&&!ph.echoed&&bonus>0){ph.echoed=true;bonus*=2;at(T+.2,()=>partHit('echo','ECHO ×2'))}
   const a=l.cs[0],b=l.cs[l.cs.length-1],mx=(a.tx+b.tx)/2,my=(a.ty+b.ty)/2;
   ph.tot+=bonus;payout(mx,my,bonus,Math.min(10,Math.max(3,bonus)));sfx.line(ph.paid.length);
@@ -569,6 +571,38 @@ function resolveCoin(c){
   if(c.res==='h'&&c.lines)c.lines.forEach(l=>{if(!l.paid&&l.cs.every(o=>o.final&&o.res==='h'))payLine(l)});
   if(--ph.left<=0)at(T+.3,effectsPhase);
 }
+// ---- slot reels: once everything has settled the board spins like a slot machine, column by column ----
+// a line is 'new' after a spin if no line has paid in those same board positions this press
+const lineKey=cs=>cs.map(o=>o.row+':'+o.col).sort().join(',');
+function spinBoard(){
+  const cols=new Map();coins.forEach(c=>{if(!cols.has(c.col))cols.set(c.col,[]);cols.get(c.col).push(c)});
+  const list=[...cols.entries()].sort((a,b)=>a[0]-b[0]).map(([,cs])=>cs.sort((a,b)=>a.row-b.row)).filter(cs=>cs.length>=2);
+  if(!list.length){endPress();return}
+  const faces=dice.map(d=>d.face),dup=new Set(faces.filter((f,i)=>faces.indexOf(f)!==i));dice.forEach(d=>{if(dup.has(d.face)){d.hl=1;d.j.punch(14)}});
+  partHit('reels',false);sfx.open();world.shake(.35);hudJ.punch(6);
+  if(J)world.popText('DOUBLES! SPIN!',W/2,(coinTop+playBot)/2,{size:Math.min(52,W/8),layers:3,kick:9,life:1.1,ci:3});
+  ph.paid=[];ph.miss=[];coins.forEach(c=>{c.hl=0});
+  const t0=T+.55;
+  reels=list.map((cs,i)=>{const L=cs.length,cell=cs[0].cell||cs[0].r*2.4,k=1+Math.floor(Math.random()*(L-1));
+    return{cs,L,cell,top:cs[0].ty,k,D:(k+L*(2+i))*cell,t0,dur:1+i*.3,rows:cs.map(c=>c.row),done:false}});
+}
+// called every frame: reels scroll down and wrap, easing to a stop; columns stop left to right
+function stepReels(){
+  if(!reels)return;
+  reels.forEach(R=>{if(R.done)return;const u=Math.max(0,Math.min(1,(T-R.t0)/R.dur)),off=R.D*(1-Math.pow(1-u,3)),span=R.L*R.cell;
+    if(u>=1){R.done=true;R.cs.forEach((c,j)=>{const p=(j+R.k)%R.L;c.ty=R.top+p*R.cell;c.row=R.rows[p];c.j.snap(c.tx,c.ty);c.j.punch(9);c.ra=1});
+      sfx.land(false);world.shake(.12);return}
+    R.cs.forEach((c,j)=>{const q=(j*R.cell+R.cell/2+off)%span;c.j.snap(c.tx,R.top-R.cell/2+q);c.ra=Math.min(1,Math.min(q,span-q)/(R.cell*.5))})});
+  if(reels.some(R=>!R.done&&T>=R.t0)&&T-reelTick>.065){reelTick=T;sfx.tick()}
+  if(reels.every(R=>R.done)){reels=null;at(T+.3,reelsLanded)}
+}
+function reelsLanded(){
+  makeLines();let n=0;
+  ph.lines.forEach(l=>{if(!l.cs.every(o=>o.final&&o.res==='h'))return;if(ph.paidKeys.has(lineKey(l.cs))){l.paid=true;return}
+    at(T+.1+n*.35,()=>{if(!l.paid)payLine(l)});n++});
+  if(!n&&J)world.popText('NO NEW LINES',W/2,(coinTop+playBot)/2,{size:Math.min(30,W/13),ci:6,life:.9});
+  at(T+.5+n*.35,endPress);
+}
 // effects step: magnets pull first (they change results), then embers, then crowns — one at a time so you can watch it
 function effectsPhase(){
   if(ph.fx)return;ph.fx=true;
@@ -597,6 +631,7 @@ function runFx(c){
 }
 function endPress(){
   if(ph.left>0){at(T+.2,endPress);return}
+  if(ph.reelTrig&&!ph.spun){ph.spun=true;spinBoard();return}
   const mid=(coinTop+playBot)/2;
   if(J&&!ph.paid.length&&!ph.teased){const near=ph.lines.filter(l=>l.cs.length>=3&&l.cs.filter(o=>o.res!=='h').length===1).slice(0,2);
     near.forEach(l=>{ph.miss.push({l,t:T});const o=l.cs.find(o=>o.res!=='h');o.j.shove(260);world.popText('1 OFF',o.tx,o.ty-o.r,{size:20,ci:1,life:.8})});if(near.length)sfx.miss(true)}
@@ -783,8 +818,8 @@ function drawCoin(c){
   const j=c.j,t=j.xf();if(t.s<.02)return;const r=c.r;let w=1,face=c.face||'h';
   if(c.flipping){const p0=Math.min(1,(T-c.t0)/c.dur),p=c.tease?1-Math.pow(1-p0,3):p0,ang=p*(c.spins||(c.res==='h'?6:7))*Math.PI,cs=Math.cos(ang);w=Math.abs(cs);face=cs>=0?'h':'t'}
   const typ=c.type||'plain',spec=typ!=='plain',gold=typ==='gold',ew=r*Math.max(.1,w),step=cycleIndex(),a=J?Math.max(j.motion,c.hl,c.flipping?.8:0,gold?.6:0):0,Hd=face==='h',lw=Math.max(2,r*.08);
-  if(cfg.shadow&&a>.02)for(let L=(gold?2:cfg.layers)-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*r/30);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y);ctx.rotate(q.r);ctx.scale(q.s,q.s);ctx.fillStyle=pal(step+j.ci+L*2);ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
-  ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);if(tease&&c!==tease.c&&!tease.line.cs.includes(c))ctx.globalAlpha=.28;
+  if(cfg.shadow&&a>.02&&!(c.ra<1))for(let L=(gold?2:cfg.layers)-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*r/30);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y);ctx.rotate(q.r);ctx.scale(q.s,q.s);ctx.fillStyle=pal(step+j.ci+L*2);ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
+  ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);if(tease&&c!==tease.c&&!tease.line.cs.includes(c))ctx.globalAlpha=.28;if(c.ra<1)ctx.globalAlpha*=Math.max(0,c.ra);
   const dim=c.dim&&!c.flipping,blank=!c.face&&!c.flipping,fill=blank?th.blank:Hd?COINS[typ].col:dim?th.tails:th.mid,clw=Math.max(3,r*.11);
   chunkBase(ctx,rotPts(ellPts(ew,r),t.r),Math.max(3,r*.2),fill,clw);ctx.rotate(t.r);
   ctx.fillStyle=fill;ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=clw;ctx.strokeStyle=th.line;ctx.stroke();
@@ -805,6 +840,8 @@ function drawPart(g,id,R,lw=3){const p=PARTS[id],P=Array.from({length:6},(_,i)=>
   const tx=(t,k)=>{g.font=`${Math.round(R*k)}px "Archivo Black", Impact, sans-serif`;g.fillText(t,0,R*.06)};
   if(id==='cascade'){g.lineWidth=Math.max(2,R*.17);[-.3,.12].forEach(y=>{g.beginPath();g.moveTo(-R*.36,y*R-R*.1);g.lineTo(0,y*R+R*.2);g.lineTo(R*.36,y*R-R*.1);g.stroke()})}
   else if(id==='sevens')tx('7',1.05);
+  else if(id==='reels'){g.lineWidth=Math.max(1.5,R*.09);for(const x of[-.34,0,.34]){rr(g,x*R-R*.13,-R*.4,R*.26,R*.8,R*.07);g.fillStyle='#fff';g.fill();g.stroke()}
+    g.strokeStyle='#ff4b3e';g.lineWidth=Math.max(2,R*.13);g.beginPath();g.moveTo(-R*.52,0);g.lineTo(R*.52,0);g.stroke()}
   else if(id==='overclock')tx('×2',.7);
   else if(id==='echo'){g.lineWidth=Math.max(2,R*.14);g.beginPath();g.arc(-R*.32,0,R*.1,0,7);g.fill();[.32,.56].forEach(q=>{g.beginPath();g.arc(-R*.32,0,R*q,-.8,.8);g.stroke()})}
   else if(id==='net'){g.lineWidth=Math.max(1.5,R*.1);for(const k of[-.26,0,.26]){g.beginPath();g.moveTo(k*R,-R*.4);g.lineTo(k*R,R*.4);g.stroke();g.beginPath();g.moveTo(-R*.4,k*R);g.lineTo(R*.4,k*R);g.stroke()}}
@@ -880,7 +917,7 @@ function frame(now){
   const raw=Math.min(.05,(now-last)/1000);last=now;const dt=raw*cfg.timeScale;T+=dt;
   for(let guard=0;guard<8;guard++){const due=events.filter(e=>e.t<=T);if(!due.length)break;events=events.filter(e=>e.t>T);due.sort((a,b)=>a.t-b.t).forEach(e=>e.fn())}
   dice.forEach(d=>{if(d.rolling){const p=Math.min(1,(T-d.t0)/d.lt);d.spin=(d.spin||0)+dt*(1-p)*22;d.ft-=dt;if(d.ft<=0){d.ft=.04+p*p*.16;d.face=anyFace(d);sfx.tumble(p)}}else d.spin=0;d.hl=Math.max(0,d.hl-dt*1.8)});
-  coins.forEach(c=>c.hl=Math.max(0,c.hl-dt*1.4));
+  coins.forEach(c=>c.hl=Math.max(0,c.hl-dt*1.4));stepReels();
   tA+=raw;
   if(amb()){
     hudJ.p.y.t=UI.hudY+Math.sin(tA*1.3)*2.2;hudJ.r.t=Math.sin(tA*.8)*.025;barJ.p.y.t=UI.barY+Math.sin(tA*1.3-.9)*1.4;
@@ -907,7 +944,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126035704';let updShown=false,updDismissed='';
+const BUILD='20261126040433';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
