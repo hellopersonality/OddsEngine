@@ -53,6 +53,7 @@ button{font:inherit;color:var(--ink)}
 #pouchBtn.bump{animation:hit .3s}
 #pouchDlg{position:fixed;inset:0;z-index:6;display:none;place-items:center;padding:14px;background:rgba(10,10,12,.8)}#pouchDlg.open{display:grid}
 #pouchBox{width:100%;max-width:520px;max-height:90vh;overflow:auto;padding:18px;display:grid;gap:12px;--rim:var(--accent);--dp:8px}
+#pouchBox .ptitle{margin:8px 0 0;font:16px/1 "Archivo Black",sans-serif;letter-spacing:.04em}
 #pouchBox h2{margin:0;font:28px/1 "Archivo Black",sans-serif}#pouchBox .note{margin:0;color:var(--muted);font-size:14px}
 .prow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 10px}
 .prow canvas{position:static;width:44px;height:44px}.prow b{display:block;font:16px/1.15 "Archivo Black",sans-serif}.prow small{color:var(--muted);font-size:14px}
@@ -262,6 +263,7 @@ const sfx={
   line(k){[0,4,7,12].forEach((n,i)=>setTimeout(()=>tone(523*2**((n+k*2)/12),.1,'square',.05),i*50))},
   miss(soft){tone(soft?330:400,soft?.15:.3,'sawtooth',soft?.025:.05,soft?220:120)},
   fx(k){[[392,523],[523,784],[659,988]][k].forEach((f,i)=>setTimeout(()=>tone(f,.09,'square',.045),i*60))},
+  boom(k){noise(.22,.2,380);tone(260-k*30,.28,'sawtooth',.06,55);setTimeout(()=>tone(880+k*120,.1,'square',.04),70)},
   perfect(){[0,4,7,12,16,19,24].forEach((n,i)=>setTimeout(()=>tone(392*2**(n/12),.14,'square',.045),i*45))}
 };
 
@@ -276,7 +278,7 @@ let th=SKINS[skin];
 // ================= game state =================
 const KEY='oddsEngine.v8',$=s=>document.querySelector(s);
 const cv=$('#cv'),ctx=cv.getContext('2d'),ui=$('#ui'),go=$('#go'),lvlEl=$('#lvl'),cardsEl=$('#cards'),rerollBtn=$('#reroll');
-const FRESH={pouch:[],lineMult:3,lv:1,slots:5,left:0,budget:0,calib:0,rebate:0,dice:0,sides:[],val:1,luck:0,reflip:0,minFace:1,gold:0,perf:2,sixes:0,chain:0,rerolls:2,presses:0,best:0};
+const FRESH={pouch:[],lineMult:3,lv:1,slots:5,left:0,budget:0,calib:0,rebate:0,dice:0,sides:[],val:1,luck:0,reflip:0,minFace:1,gold:0,perf:2,sixes:0,chain:0,boom:0,rerolls:2,presses:0,best:0};
 const SIDES=[4,6,8,10,12,20];
 // ---- coin types: live in the pouch; specials with neighbour effects resolve in an effects step after the flips ----
 const COINS={
@@ -286,17 +288,30 @@ const COINS={
   wild:{name:'Wild coin',col:'#3ddc97',desc:'Always heads for paylines, but pays nothing itself'},
   ember:{name:'Ember coin',col:'#ff6b3d',desc:'If heads: +1 coin value for every heads touching it'},
   magnet:{name:'Magnet coin',col:'#4cc9f0',desc:'If heads: re-flips every tails touching it'},
-  crown:{name:'Crown coin',col:'#ff5ca8',desc:'If heads and every coin touching it is heads: pays ×10'}};
-const FXORDER={magnet:0,ember:1,crown:2};
+  crown:{name:'Crown coin',col:'#ff5ca8',desc:'If heads and every coin touching it is heads: pays ×10'},
+  mirror:{name:'Mirror coin',col:'#d7cfff',desc:'Copies the coin its arrow points at, value and all'}};
+// mirrors copy first (their targets must be settled), then magnets pull, then embers, then crowns
+const FXORDER={mirror:-1,magnet:0,ember:1,crown:2};
+const MDIRS=[[0,-1],[0,1],[-1,0],[1,0]];
+// ---- machine parts: rule-changers, a few slots, swapped like dice when full ----
+const PARTS={
+  cascade:{name:'Cascade',r:2,col:'#4cc9f0',desc:'When a line pays, its coins drop away and fresh coins fall in and flip (up to 3 times a press)'},
+  sevens:{name:'Lucky sevens',r:1,col:'#ff5ca8',desc:'If your dice add up to a multiple of 7, the whole press pays ×2'},
+  overclock:{name:'Overclock',r:1,col:'#ff4b3e',desc:'Dice spill twice the coins, but you get 1 fewer press per level'},
+  echo:{name:'Echo chamber',r:1,col:'#c39bff',desc:'The first line every press pays double'},
+  net:{name:'Safety net',r:0,col:'#3ddc97',desc:'Tails in the bottom row flip once more'},
+  consol:{name:'Consolation',r:0,col:'#a9b4c4',desc:'Every tails pays 1'}};
+const PSLOTS=3;
 const countOf=t=>S.pouch.filter(x=>x===t).length;
 // plain coins are unlimited; the pouch holds only special coins, and every one of them is played each press
 // (if a press has fewer coins than specials, a random handful of specials make it). Positions are shuffled.
 let bag=[];
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 function drawPouch(n){const sp=shuffle([...S.pouch]).slice(0,n);while(sp.length<n)sp.push('plain');return shuffle(sp)}
-const S={...FRESH,sides:[],pouch:[...FRESH.pouch]};
+const S={...FRESH,sides:[],pouch:[...FRESH.pouch],parts:[]};
+const hasPart=id=>S.parts.includes(id);
 const score=new CountUp(0);
-const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');score.value=score.shown=+d.score||0}}catch(e){}
+const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');if(Array.isArray(d.parts))S.parts=d.parts.filter(id=>PARTS[id]).slice(0,PSLOTS);score.value=score.shown=+d.score||0}}catch(e){}
 S.sides=S.sides.slice(0,S.dice);while(S.sides.length<S.dice)S.sides.push(6);
 function save(){try{localStorage.setItem(KEY,JSON.stringify({...S,score:score.value}))}catch(e){}}
 const ROLL=.8,LAND_GAP=.2,FLIP=.42;
@@ -305,7 +320,7 @@ const resFor=t=>t==='gold'||t==='wild'?'h':Math.random()<(t==='lead'?.75:headsP(
 const need=()=>Math.round(2*Math.pow(1.6,S.lv-1));
 // level 1 is free play (no limit); from level 2 on every level gets a fixed press budget
 const BUDGET=5,calibrating=()=>!S.budget;
-const budget=()=>S.budget;
+const budget=()=>Math.max(1,S.budget-(hasPart('overclock')?1:0));
 let bestLv=1;try{bestLv=+localStorage.getItem('oddsEngine.bestLv')||1}catch(e){}
 if(matchMedia('(prefers-reduced-motion: reduce)').matches)cfg.shake=false;
 
@@ -322,9 +337,11 @@ const POOL=[
   {id:'poly',r:0,max:99,dice:1,name:'Polyhedral',lvl:()=>S.sides.reduce((a,v)=>a+SIDES.indexOf(v)-1,0),ok:()=>S.sides.some(v=>v<20),desc:()=>{const m=Math.min(...S.sides);return`Your smallest die, a d${m}, becomes a d${SIDES[SIDES.indexOf(m)+1]}`}},
   {id:'reflip',r:1,max:3,name:'Second chance',lvl:()=>S.reflip,desc:()=>S.reflip?`${S.reflip+1} tails every press get flipped again`:'One tails every press gets flipped again'},
   {id:'loaded',r:1,max:3,dice:1,name:'Loaded dice',lvl:()=>S.minFace-1,desc:()=>`Dice never roll below ${S.minFace+1}`},
-  ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Goes in your pouch and plays every press'})),
+  ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1],['mirror',1,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Goes in your pouch and plays every press'})),
   {id:'perf',r:1,max:4,dice:1,name:'Perfectionist',lvl:()=>S.perf-2,desc:()=>`All heads pays ×${S.perf+1} instead of ×${S.perf}`},
   {id:'sixes',r:1,max:4,dice:1,name:'Max roll bonus',lvl:()=>S.sixes/2,desc:()=>`A die's highest roll (6 on a d6, 20 on a d20) adds ${S.sixes+2} bonus coins`},
+  {id:'boom',r:1,max:3,dice:1,name:'Exploding dice',lvl:()=>S.boom,desc:()=>S.boom?`Max rolls can explode up to ${S.boom+1} times in a row`:'A max roll explodes: the die rolls again and adds to the count'},
+  ...Object.entries(PARTS).map(([id,q])=>({id:'p_'+id,part:id,r:q.r,w:.6,max:1,dice:id==='consol'?0:1,name:q.name,lvl:()=>hasPart(id)?1:0,desc:()=>q.desc+(S.parts.length>=PSLOTS?'. Parts full: swap one out':'')})),
   {id:'chain',r:2,max:5,dice:1,name:'Hot streak',lvl:()=>S.chain,desc:()=>`Each heads in a row pays +${S.chain+1} more than the last`}
 ];
 const RW=[10,4.5,1.6];
@@ -411,9 +428,9 @@ addEventListener('resize',()=>{if(over||lvlOpen)fitAll()});
 function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}$('#stLv').textContent=S.lv;$('#stBest').textContent='+'+fmt(S.best);$('#stRecord').textContent=bestLv;
   const short=need()-score.value;$('#ovTitle').textContent=short<=Math.max(2,need()*.2)?'SO CLOSE!':'OUT OF PRESSES';
   const sub=$('#ovSub');sub.textContent='';const line=t=>{const e=document.createElement('span');e.textContent=t;sub.appendChild(e)};
-  if(short<=Math.max(2,need()*.2))line(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)line(`Your machine: ${S.sides.map(v=>'d'+v).join(' · ')}`);
+  if(short<=Math.max(2,need()*.2))line(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)line(`Your machine: ${S.sides.map(v=>'d'+v).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
-function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
+function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];busy=false;save();layout();const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)];sfx.buy()}
 function refreshGo(){const h=busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
   if(!h){go.classList.remove('ready');void go.offsetWidth;go.classList.add('ready');sfx.ready()}else go.classList.remove('down')}
@@ -426,25 +443,33 @@ function press(){
   if(!dice.length){
     let c=coins[0];
     if(!c||coins.length!==1){clearCoins();const s=coinSlots(1)[0];c=makeCoin(s.x,s.y,s,false);coins=[c]}
-    c.face=null;c.dim=0;c.final=false;c.type=drawPouch(1)[0];c.res=resFor(c.type);ph.n=ph.left=1;
+    c.face=null;c.dim=0;c.final=false;c.netted=false;c.pc=false;c.copyVal=null;c.type=drawPouch(1)[0];c.res=resFor(c.type);ph.n=ph.left=1;
     at(.05,()=>startFlip(c));
   }else{
     clearCoins();
-    const rolls=dice.map(roll),counts=rolls.map((v,i)=>v+(v===dice[i].sides?S.sixes:0)),n=counts.reduce((a,b)=>a+b,0);ph.n=ph.left=n;
+    // exploding dice: a max roll rolls again and adds, up to S.boom extra rolls
+    const seqs=dice.map(d=>{const q=[roll(d)];while(q.length<=S.boom&&q[q.length-1]===d.sides)q.push(roll(d));return q}),rolls=seqs.map(q=>q[q.length-1]),
+      oc=hasPart('overclock')?2:1,counts=seqs.map((q,i)=>(q.reduce((a,b)=>a+b,0)+q.filter(v=>v===dice[i].sides).length*S.sixes)*oc),n=counts.reduce((a,b)=>a+b,0);ph.n=ph.left=n;
+    const sum=seqs.reduce((a,q)=>a+q.reduce((x,y)=>x+y,0),0);ph.seven=hasPart('sevens')&&sum>0&&sum%7===0;ph.sum=sum;
     const sl=coinSlots(n);let g=0;
     const types=drawPouch(n);
     const per=dice.map((d,i)=>{const mine=[];for(let k=0;k<counts[i];k++){const s_=sl[g],c=makeCoin(d.hx,d.hy,s_,true);c.cell=s_.cell;c.type=types[g++];c.res=resFor(c.type);coins.push(c);mine.push(c)}return mine});
     sfx.rattle();
-    const landLast=ROLL+(dice.length-1)*LAND_GAP,spill=Math.max(.012,Math.min(.04,.5/Math.max(1,n)));
+    const spill=Math.max(.012,Math.min(.04,.5/Math.max(1,n))),land=dice.map((d,i)=>ROLL+i*LAND_GAP+(seqs[i].length-1)*BOOM);
     dice.forEach((d,i)=>{
       d.rolling=true;d.t0=T;d.lt=ROLL+i*LAND_GAP;d.ft=0;
       if(cfg.punch){d.j.p.y.v-=900+Math.random()*250;d.j.p.x.v+=(Math.random()*2-1)*260;d.j.punch(10)}
-      at(d.lt,()=>landDie(d,rolls[i],per[i],spill));
+      seqs[i].slice(0,-1).forEach((v,k)=>at(d.lt+k*BOOM,()=>explodeDie(d,v,k+1)));
+      at(land[i],()=>landDie(d,rolls[i],per[i],spill,seqs[i]));
     });
-    buildLines(sl);
+    buildLines(sl);ph.botRow=Math.max(...sl.map(o=>o.row));
+    // mirrors: each points at a random neighbour and copies it in the effects step instead of flipping
+    {const grid=new Map(coins.map(c=>[c.row+','+c.col,c]));
+      coins.forEach(c=>{if(c.type!=='mirror')return;const opts=MDIRS.filter(([dr,dc])=>grid.get((c.row+dr)+','+(c.col+dc)));
+        if(opts.length){c.mdir=opts[Math.floor(Math.random()*opts.length)];c.mtg=grid.get((c.row+c.mdir[0])+','+(c.col+c.mdir[1]));ph.left--}})}
     // flips: pile by pile, in die order, after every die has landed and spilled; a queue so a tease can pause the machine
-    const stag=Math.max(.03,Math.min(.11,2/n)),q=[];per.forEach((mine,i)=>{q.push({die:i});mine.forEach(c=>q.push({c}))});
-    at(landLast+.35+counts[counts.length-1]*spill,()=>runQueue(q,stag));
+    const stag=Math.max(.03,Math.min(.11,2/n)),q=[];per.forEach((mine,i)=>{q.push({die:i});mine.forEach(c=>{if(!c.mdir)q.push({c})})});
+    at(Math.max(...land.map((t,i)=>t+counts[i]*spill))+.35,()=>runQueue(q,stag));
   }
 }
 let lastTick=0;
@@ -456,19 +481,30 @@ function payout(x,y,v,k){
     world.fly(x,y,hudJ.p.x.x,hudJ.p.y.x,()=>{score.add(share);hudJ.punch(3);barJ.punch(1.5);const now=performance.now();if(now-lastTick>28){lastTick=now;sfx.tick()}})}
 }
 let ciN=0;const i8=()=>(ciN=(ciN+3)%8);
-function landDie(d,v,mine,spill){
+const BOOM=.6;
+// a die landed on its max with Exploding dice: it bursts, jumps and rolls again
+function explodeDie(d,v,k){
+  d.rolling=false;d.face=v;d.hl=1;d.j.p.x.t=d.hx;d.j.punch(22).shove(420);sfx.land(true);sfx.boom(k);world.shake(.3+.08*k);hudJ.punch(4);
+  if(J){world.burst(d.hx,d.hy,5+k*2);world.popText(k>1?'BOOM ×'+k+'!':'BOOM!',d.hx,d.hy-d.size*.95,{size:Math.max(24,d.size*.62),layers:2,kick:8,ci:1,life:.85});
+    if(S.sixes)world.popText('+'+S.sixes,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
+  if(cfg.punch)d.j.p.y.v-=650;
+  at(T+.12,()=>{d.rolling=true;d.t0=T;d.lt=BOOM-.12;d.ft=0});
+}
+function landDie(d,v,mine,spill,seq=[v]){
+  const maxed=seq.includes(d.sides),tot=seq.reduce((a,b)=>a+b,0);
   d.rolling=false;d.face=v;d.hl=1;d.j.p.x.t=d.hx;d.j.punch(16).shove(300);if(cfg.punch)d.j.r.x=(Math.random()<.5?-1:1)*.35;
   sfx.land(v===d.sides);world.shake(v===d.sides?.22:.13);
-  if(v===d.sides&&ph.refunds<S.rebate){ph.refunds++;S.left++;updateGoLabel();sfx.ping();if(J)world.popText('PRESS BACK!',d.hx,d.hy+d.size*.9,{size:24,ci:4,layers:2,life:1})}
+  if(seq.length>1&&J)world.popText('= '+tot,d.hx,d.hy+d.size*1.05,{size:Math.max(24,d.size*.6),layers:2,kick:7,ci:3,life:1.1});
+  if(hasPart('overclock')){partJ('overclock').punch(8);if(J)world.popText('×2',d.hx-d.size*.65,d.hy+d.size*.2,{size:Math.max(18,d.size*.4),ci:1,life:.8})}
+  if(maxed&&ph.refunds<S.rebate){ph.refunds++;S.left++;updateGoLabel();sfx.ping();if(J)world.popText('PRESS BACK!',d.hx,d.hy+d.size*.9,{size:24,ci:4,layers:2,life:1})}
   if(J){world.popText(String(v),d.hx+d.size*.55,d.hy-d.size*.55,{size:Math.max(22,d.size*.55),rise:14,ci:i8()});
-    if(v===d.sides&&S.sixes)world.popText('+'+S.sixes,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
+    if(v===d.sides&&S.sixes&&seq.length===1)world.popText('+'+S.sixes,d.hx-d.size*.6,d.hy-d.size*.55,{size:Math.max(20,d.size*.45),ci:4})}
   mine.forEach((c,k)=>at(T+.08+k*spill,()=>{spawnCoin(c);if(k%2===0)sfx.spill(k)}));
 }
 // paylines: full rows (3+), full columns and the two diagonals of the complete part of the grid
 // paylines follow the actual layout: every straight run of 3+ coins across, down or along either diagonal
 function buildLines(sl){
-  const n=coins.length,L=[];if(n<3)return;
-  coins.forEach((c,i)=>{c.row=sl[i].row;c.col=sl[i].col;c.lines=[]});
+  const n=coins.length,L=[];coins.forEach((c,i)=>{c.row=sl[i].row;c.col=sl[i].col;c.lines=[]});if(n<3)return;
   const grid=new Map(coins.map(c=>[c.row+','+c.col,c])),get=(r,c)=>grid.get(r+','+c);
   for(const[dr,dc]of[[0,1],[1,0],[1,1],[1,-1]])coins.forEach(c=>{
     if(get(c.row-dr,c.col-dc))return;            // only start at the beginning of a run
@@ -477,7 +513,7 @@ function buildLines(sl){
   ph.lines=L.map(cs=>({cs,paid:false}));ph.lines.forEach(l=>l.cs.forEach(c=>c.lines.push(l)));
 }
 function runQueue(q,stag){
-  const it=q.shift();if(!it)return;
+  const it=q.shift();if(!it){if(ph.left<=0)at(T+.3,effectsPhase);return}
   if(it.c===undefined){dice[it.die].hl=1;dice[it.die].j.punch(6);at(T+.14,()=>runQueue(q,stag));return}
   const tz=teaseLine(it.c);startFlip(it.c,tz);at(T+(tz?TEASE+.3:stag),()=>runQueue(q,stag));
 }
@@ -495,26 +531,39 @@ function startFlip(c,tz){
   c.j.punch(5);sfx.flip();at(T+c.dur,()=>resolveCoin(c));
 }
 function payLine(l){
-  l.paid=true;ph.paid.push({l,t:T});const sum=l.cs.reduce((a,o)=>a+(o.val||0),0),bonus=sum*(S.lineMult-1);
+  l.paid=true;ph.paid.push({l,t:T});const sum=l.cs.reduce((a,o)=>a+(o.val||0),0);let bonus=sum*(S.lineMult-1);
+  if(hasPart('echo')&&!ph.echoed&&bonus>0){ph.echoed=true;bonus*=2;at(T+.2,()=>partHit('echo','ECHO ×2'))}
   const a=l.cs[0],b=l.cs[l.cs.length-1],mx=(a.tx+b.tx)/2,my=(a.ty+b.ty)/2;
   ph.tot+=bonus;payout(mx,my,bonus,Math.min(10,Math.max(3,bonus)));sfx.line(ph.paid.length);
   l.cs.forEach(o=>{o.hl=1;o.j.punch(9)});hudJ.punch(10);
   if(J){world.popText('LINE ×'+S.lineMult,mx,my,{size:Math.min(52,W/8),layers:2,kick:8,life:1.2,ci:ph.paid.length*3});world.shake(.3)}
+  // cascade: the line's coins drop away and fresh plain coins fall in and flip; ph.left is reserved now so the press can't end first
+  const fresh=l.cs.filter(o=>!o.pc);
+  if(hasPart('cascade')&&fresh.length&&(ph.casc||0)<3){ph.casc=(ph.casc||0)+1;fresh.forEach(o=>o.pc=true);ph.left+=fresh.length;at(T+.65,()=>cascadeLine(fresh))}
+}
+function cascadeLine(fresh){
+  partHit('cascade',ph.casc>1?'CASCADE ×'+ph.casc:'CASCADE');sfx.open();world.shake(.25);
+  fresh.forEach(o=>{o.final=false;o.j.hide();(o.lines||[]).forEach(l=>{l.paid=false;ph.paid=ph.paid.filter(p=>p.l!==l)})});
+  fresh.forEach((o,i)=>at(T+.25+i*.07,()=>{Object.assign(o,{type:'plain',copyVal:null,noAgain:false,netted:false,res:resFor('plain'),face:null,dim:0,val:0,hl:0,hidden:true,mdir:null});
+    o.j.snap(o.tx,o.ty-o.r*2.6);o.j.s.x=0;startFlip(o)}));
 }
 function resolveCoin(c){
   const wasTease=c.tease;if(c.tease){c.tease=false;c.j.s.t=1;c.j.moveTo(c.tx,c.ty);tease=null}
-  c.flipping=false;c.face=c.res;c.j.punch(10).wobble(.25);
+  c.flipping=false;c.face=c.res;c.pc=false;c.j.punch(10).wobble(.25);
   const k=ph.n>24?1:ph.n>8?2:3;
   if(c.res==='h'){
-    const gold=c.type==='gold';let v=c.type==='lead'?1:c.type==='wild'?0:(S.val+S.chain*ph.streak)*(gold?5:1);ph.streak++;c.val=v;c.final=true;
+    const gold=c.type==='gold';let v=c.copyVal!=null?c.copyVal:c.type==='lead'?1:c.type==='wild'?0:(S.val+S.chain*ph.streak)*(gold?5:1);ph.streak++;c.val=v;c.final=true;
     ph.tot+=v;ph.heads++;barJ.punch(2);c.hl=1;payout(c.tx,c.ty,v,gold?k+3:k);
     sfx.heads(ph.heads-1);if(gold)sfx.gold();
-    if(J){if(c.type==='wild')world.popText('WILD',c.tx,c.ty-c.r*.9,{size:Math.max(16,Math.min(30,c.r*.55)),ci:4,life:.7});else world.popText('+'+fmt(v),c.tx,c.ty-c.r*.9,{size:Math.max(18,Math.min(gold?48:40,c.r*(gold?.95:.75))),ci:i8(),layers:gold?2:1});world.shake(gold?.12:.035)}
+    if(J){if(c.type==='wild'||v===0)world.popText(c.type==='mirror'?'COPY':'WILD',c.tx,c.ty-c.r*.9,{size:Math.max(16,Math.min(30,c.r*.55)),ci:4,life:.7});else world.popText('+'+fmt(v),c.tx,c.ty-c.r*.9,{size:Math.max(18,Math.min(gold?48:40,c.r*(gold?.95:.75))),ci:i8(),layers:gold?2:1});world.shake(gold?.12:.035)}
   }else{
-    if(ph.reflips<S.reflip){ph.reflips++;c.res=resFor(c.type);sfx.again();
+    if(ph.reflips<S.reflip&&!c.noAgain){ph.reflips++;c.res=resFor(c.type);sfx.again();
       if(J)world.popText('AGAIN!',c.tx,c.ty-c.r*.8,{size:Math.max(18,Math.min(34,c.r*.6)),ci:5,life:.6});
       at(T+.28,()=>startFlip(c));return}
+    if(hasPart('net')&&!c.noAgain&&!c.netted&&ph.botRow!=null&&c.row===ph.botRow){c.netted=true;c.res=resFor(c.type);partJ('net').punch(10).wobble(.4);sfx.again();
+      if(J)world.popText('NET!',c.tx,c.ty-c.r*.8,{size:Math.max(18,Math.min(34,c.r*.6)),ci:4,life:.6});at(T+.28,()=>startFlip(c));return}
     c.dim=1;c.j.shove(140);sfx.tails();ph.streak=0;c.final=true;
+    if(hasPart('consol')){ph.tot+=1;payout(c.tx,c.ty,1,1);partJ('consol').punch(5);if(J)world.popText('+1',c.tx,c.ty-c.r*.8,{size:Math.max(16,Math.min(26,c.r*.5)),ci:6,life:.6})}
     if(wasTease){sfx.miss();world.shake(.25);if(J)world.popText('SO CLOSE!',c.tx,c.ty-c.r*1.1,{size:Math.min(44,W/9),layers:2,kick:6,life:1.3,ci:1})}
   }
   if(c.res==='h'&&c.lines)c.lines.forEach(l=>{if(!l.paid&&l.cs.every(o=>o.final&&o.res==='h'))payLine(l)});
@@ -523,16 +572,20 @@ function resolveCoin(c){
 // effects step: magnets pull first (they change results), then embers, then crowns — one at a time so you can watch it
 function effectsPhase(){
   if(ph.fx)return;ph.fx=true;
-  const list=coins.filter(c=>FXORDER[c.type]!==undefined&&c.final&&c.res==='h').sort((a,b)=>FXORDER[a.type]-FXORDER[b.type]);
+  const depth=c=>{let k=0,o=c.mtg;while(o&&o.type==='mirror'&&o.mdir&&k<8){k++;o=o.mtg}return k};
+  const list=coins.filter(c=>c.type==='mirror'?c.mdir&&!c.final:FXORDER[c.type]!==undefined&&c.final&&c.res==='h').sort((a,b)=>FXORDER[a.type]-FXORDER[b.type]||depth(a)-depth(b));
   if(!list.length){endPress();return}
-  let t=T+.2;list.forEach(c=>{at(t,()=>runFx(c));t+=c.type==='magnet'?FLIP+.5:.45});at(t+.1,endPress);
+  let t=T+.2;list.forEach(c=>{at(t,()=>runFx(c));t+=c.type==='magnet'?FLIP+.5:c.type==='mirror'?.5:.45});at(t+.1,endPress);
 }
 function fxPop(c,txt,o={}){if(J)world.popText(txt,c.tx,c.ty-c.r*1.05,{size:o.size||Math.max(18,Math.min(36,c.r*.7)),ci:o.ci??3,layers:o.layers||1,kick:o.kick,life:o.life||.9})}
 function runFx(c){
+  if(c.type==='mirror'){const tg=c.mtg;let src=tg,k=0;while(src&&src.type==='mirror'&&src.mdir&&!src.final&&k<8){src=src.mtg;k++}
+    const h=!!(src&&src.final&&src.res==='h');c.res=h?'h':'t';c.copyVal=h?(src.val||0):0;c.noAgain=true;c.hl=1;c.j.punch(14).wobble(.4);sfx.fx(0);
+    if(tg){tg.hl=1;tg.j.punch(8)}fxPop(c,'MIRROR',{ci:5,layers:2});ph.left++;startFlip(c);return}
   const nb=nbrs(c);c.hl=1;c.j.punch(14).wobble(.4);nb.forEach(o=>{o.hl=.8;o.j.punch(4)});
   if(c.type==='magnet'){const tl=nb.filter(o=>o.final&&o.res!=='h');sfx.fx(0);
     if(!tl.length){fxPop(c,'nothing to pull',{size:16,ci:6});return}
-    fxPop(c,'MAGNET!',{ci:5,layers:2});tl.forEach(o=>{o.final=false;o.dim=0;o.face=null;o.res=resFor(o.type);ph.left++;o.j.moveTo((o.tx*2+c.tx)/3,(o.ty*2+c.ty)/3);at(T+.12,()=>{o.j.moveTo(o.tx,o.ty);startFlip(o)})});
+    fxPop(c,'MAGNET!',{ci:5,layers:2});tl.forEach(o=>{o.final=false;o.dim=0;o.face=null;o.copyVal=null;o.res=resFor(o.type);ph.left++;o.j.moveTo((o.tx*2+c.tx)/3,(o.ty*2+c.ty)/3);at(T+.12,()=>{o.j.moveTo(o.tx,o.ty);startFlip(o)})});
   }else if(c.type==='ember'){const h=nb.filter(o=>o.final&&o.res==='h').length,bonus=h*S.val;sfx.fx(1);
     if(!bonus){fxPop(c,'no heads touching',{size:16,ci:6});return}
     ph.tot+=bonus;payout(c.tx,c.ty,bonus,Math.min(6,bonus));fxPop(c,'+'+fmt(bonus)+' EMBER',{ci:1,layers:2});world.shake(.12);
@@ -548,10 +601,12 @@ function endPress(){
   if(J&&!ph.paid.length&&!ph.teased){const near=ph.lines.filter(l=>l.cs.length>=3&&l.cs.filter(o=>o.res!=='h').length===1).slice(0,2);
     near.forEach(l=>{ph.miss.push({l,t:T});const o=l.cs.find(o=>o.res!=='h');o.j.shove(260);world.popText('1 OFF',o.tx,o.ty-o.r,{size:20,ci:1,life:.8})});if(near.length)sfx.miss(true)}
   if(ph.tot>0){
-    const perfect=ph.n>=2&&ph.heads===ph.n;
+    const perfect=ph.n>=2&&coins.every(o=>o.final&&o.res==='h');
     if(perfect){const bonus=ph.tot*(S.perf-1);payout(W/2,mid,bonus,Math.min(16,Math.max(6,bonus)));ph.tot+=bonus;hudJ.punch(14).shove(400);sfx.perfect();
       if(J){world.popText('PERFECT ×'+S.perf,W/2,mid,{size:Math.min(64,W/7.5),layers:3,kick:9,life:1.6});world.shake(.6)}}
     else hudJ.punch(8);
+    if(ph.seven){const bonus=ph.tot;payout(W/2,mid+30,bonus,Math.min(16,Math.max(6,bonus)));ph.tot+=bonus;partHit('sevens',false);sfx.perfect();hudJ.punch(12);
+      if(J){world.popText(`${ph.sum}! LUCKY 7s ×2`,W/2,mid+(perfect?70:0),{size:Math.min(50,W/9),layers:3,kick:9,life:1.6,ci:0});world.shake(.5)}}
     if(ph.tot>S.best){if(S.presses>3&&J&&ph.n>1)world.popText('NEW BEST!',W/2,mid+48,{size:26,ci:1,life:1.1});S.best=ph.tot}
   }
   const tot=ph.tot;
@@ -569,6 +624,8 @@ function iconFor(id,c){
   const poly=(n,txt)=>{g.save();g.translate(30,30);polyPath(g,n,23);g.fillStyle=th.obj;g.save();g.translate(4,4);polyPath(g,n,23);g.fill();g.restore();polyPath(g,n,23);g.fillStyle='#fff';g.fill();g.stroke();g.fillStyle='#111';g.font='16px "Archivo Black", sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(txt,0,2);g.restore()};
   if(/^d\d+$/.test(id)){dieIcon(c,+id.slice(1),64);return}
   if(id.startsWith('c_')){coinIcon(c,id.slice(2),64);return}
+  if(id.startsWith('p_')){partIcon(c,id.slice(2),64);return}
+  if(id==='boom'){g.fillStyle='#ff9f1c';g.beginPath();for(let i=0;i<16;i++){const a=i*Math.PI/8,q=i%2?14:29;g.lineTo(30+Math.cos(a)*q,30+Math.sin(a)*q)}g.closePath();g.fill();g.stroke();die(14,14,32,6);return}
   ({lines:()=>{[14,30,46].forEach(x=>coin(x,30,9,'#ffd23f',''));g.lineWidth=5;g.strokeStyle='#ff5ca8';g.beginPath();g.moveTo(8,30);g.lineTo(52,30);g.stroke()},slots:()=>{die(4,14,30,1);die(30,14,30,1)},rebate:()=>coin(30,30,22,'#4cc9f0','+1'),loaded:()=>die(9,9,42,5),sixes:()=>poly(20,'20'),poly:()=>poly(Math.min(...S.sides,20)===20?20:SIDES[SIDES.indexOf(Math.min(...S.sides))+1],'d'+(SIDES[SIDES.indexOf(Math.min(...S.sides))+1]||20)),
     val:()=>coin(30,30,22,'#ffd23f','+1'),luck:()=>coin(30,30,22,'#3ddc97','%'),reflip:()=>coin(30,30,22,'#c9b6ff','↻'),
     gold:()=>coin(30,30,22,'#ff9f1c','×5'),perf:()=>coin(30,30,22,'#ff5ca8','×'+(S.perf+1)),
@@ -579,7 +636,7 @@ function showCards(){
   offersNow=drawOffers();cardsEl.innerHTML='';
   offersNow.forEach((p,i)=>{
     const b=document.createElement('button');b.className=`card slab r${p.r}`;b.style.animationDelay=(i*.13)+'s';
-    const band=document.createElement('span');band.className='band';band.textContent=RN[p.r];
+    const band=document.createElement('span');band.className='band';band.textContent=RN[p.r]+(p.part?' part':'');
     const c=document.createElement('canvas');iconFor(p.id,c);
     const nm=document.createElement('b');nm.textContent=p.name;
     const ds=document.createElement('small');ds.textContent=p.desc();
@@ -600,6 +657,7 @@ function openLevel(){
 function pick(p,swapIdx){
   if(!lvlOpen)return;
   if(p.die&&dice.length>=S.slots&&swapIdx===undefined){showSwap(p);return}
+  if(p.part&&S.parts.length>=PSLOTS&&swapIdx===undefined){showPartSwap(p);return}
   lvlOpen=false;lvlEl.classList.remove('open');sfx.buy();hideSwap();
   world.coins=[];const carry=Math.max(0,score.value-need());score.value=score.shown=carry;const wasCalib=calibrating();if(wasCalib)S.budget=BUDGET;S.lv++;S.left=budget();
   if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}
@@ -610,7 +668,8 @@ function pick(p,swapIdx){
   else if(p.die){
     if(swapIdx!==undefined){const d=dice[swapIdx];S.sides[swapIdx]=p.die;d.sides=p.die;d.face=p.die;d.j.pop();d.hl=1;sfx.land(true)}
     else{S.dice++;S.sides.push(p.die);addDie(true,p.die);layout();if(S.dice===1)clearCoins()}
-  }else({val:()=>{S.val++},luck:()=>{S.luck++},reflip:()=>{S.reflip++},slots:()=>{S.slots++},rebate:()=>{S.rebate++},lines:()=>{S.lineMult++},
+  }else if(p.part){if(swapIdx!==undefined)S.parts[swapIdx]=p.part;else S.parts.push(p.part);S.left=budget();partJ(p.part).pop()
+  }else({boom:()=>{S.boom++},val:()=>{S.val++},luck:()=>{S.luck++},reflip:()=>{S.reflip++},slots:()=>{S.slots++},rebate:()=>{S.rebate++},lines:()=>{S.lineMult++},
     poly:()=>{const m=Math.min(...S.sides),i=S.sides.indexOf(m),nx=SIDES[SIDES.indexOf(m)+1];S.sides[i]=nx;dice[i].sides=nx;dice[i].face=nx;dice[i].j.pop();dice[i].hl=1},
     loaded:()=>{S.minFace++},perf:()=>{S.perf++},sixes:()=>{S.sixes+=2},chain:()=>{S.chain++}})[p.id]();
   coins.forEach(c=>{c.j.punch(8);c.hl=1});dice.forEach(d=>{d.j.punch(8);d.hl=1});
@@ -624,6 +683,13 @@ function showSwap(p){
   const row=$('#swapRow');row.innerHTML='';
   dice.forEach((d,i)=>{const b=document.createElement('button');b.className='sw slab';const c=document.createElement('canvas');dieIcon(c,d.sides,56);
     const l=document.createElement('span');l.textContent='d'+d.sides;b.append(c,l);b.addEventListener('click',()=>pick(p,i));row.appendChild(b)});
+  sfx.press();setTimeout(()=>{const f=row.querySelector('.sw');if(f)f.focus({preventScroll:true})},30);
+}
+function showPartSwap(p){
+  cardsEl.hidden=true;rerollBtn.hidden=true;$('#swap').hidden=false;$('.sub').textContent=`Parts full: swap ${p.name} in for which part?`;
+  const row=$('#swapRow');row.innerHTML='';
+  S.parts.forEach((id,i)=>{const b=document.createElement('button');b.className='sw slab';const c=document.createElement('canvas');partIcon(c,id,56);
+    const l=document.createElement('span');l.textContent=PARTS[id].name;b.append(c,l);b.addEventListener('click',()=>pick(p,i));row.appendChild(b)});
   sfx.press();setTimeout(()=>{const f=row.querySelector('.sw');if(f)f.focus({preventScroll:true})},30);
 }
 function hideSwap(){cardsEl.hidden=false;rerollBtn.hidden=false;$('#swap').hidden=true;$('.sub').textContent='Pick one'}
@@ -644,6 +710,10 @@ function openPouch(){const L=$('#pouchList');L.innerHTML='';
     const tx=document.createElement('div'),b=document.createElement('b'),sm=document.createElement('small'),n=document.createElement('span');b.textContent=COINS[t].name;sm.textContent=COINS[t].desc;n.className='n';n.textContent=t==='plain'?'∞':'×'+countOf(t);if(t==='plain')sm.textContent='Unlimited. They fill every spot your specials don\'t';
     tx.append(b,sm);row.append(cv_,tx,n);L.appendChild(row)});
   if(!S.pouch.length){const e=document.createElement('p');e.className='note';e.textContent='No special coins yet. They come from level-up cards.';L.appendChild(e)}
+  const ph_=document.createElement('h3');ph_.className='ptitle';ph_.textContent=`MACHINE PARTS ${S.parts.length}/${PSLOTS}`;L.appendChild(ph_);
+  S.parts.forEach(id=>{const row=document.createElement('div');row.className='prow slab';const cv_=document.createElement('canvas');partIcon(cv_,id,44);
+    const tx=document.createElement('div'),b=document.createElement('b'),sm=document.createElement('small');b.textContent=PARTS[id].name;sm.textContent=PARTS[id].desc;tx.append(b,sm);row.append(cv_,tx,document.createElement('span'));L.appendChild(row)});
+  if(!S.parts.length){const e=document.createElement('p');e.className='note';e.textContent='No parts yet. Rule-changing parts come from level-up cards.';L.appendChild(e)}
   pouchDlg.classList.add('open');setTimeout(()=>$('#pouchClose').focus(),30)}
 pouchBtn.addEventListener('click',openPouch);$('#pouchClose').addEventListener('click',()=>pouchDlg.classList.remove('open'));
 pouchDlg.addEventListener('click',e=>{if(e.target===pouchDlg)pouchDlg.classList.remove('open')});
@@ -694,7 +764,7 @@ function drawDie(d){
   ctx.restore();
   if(!d.rolling&&d.sides!==6){ctx.font='11px "Archivo Black", sans-serif';ctx.textAlign='center';ctx.fillStyle=th.hint;ctx.fillText('d'+d.sides,d.hx,d.hy+s*.86+4)}
 }
-function glyph(g,type,r){
+function glyph(g,type,r,dir){
   g.fillStyle='#111';g.strokeStyle='#111';g.textAlign='center';g.textBaseline='middle';
   const txt=(t,k)=>{g.font=`${Math.round(r*k)}px "Archivo Black", Impact, sans-serif`;g.fillText(t,0,r*.05)};
   if(!type||type==='plain'){const t=fmt(S.val);txt(t,t.length>2?.55:.85)}
@@ -703,6 +773,10 @@ function glyph(g,type,r){
   else if(type==='wild'){g.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,q=i%2?r*.24:r*.56;g.lineTo(Math.cos(a)*q,Math.sin(a)*q+r*.04)}g.closePath();g.fill()}
   else if(type==='ember'){g.beginPath();g.moveTo(0,-r*.56);g.quadraticCurveTo(r*.5,-r*.02,r*.32,r*.32);g.quadraticCurveTo(0,r*.62,-r*.32,r*.32);g.quadraticCurveTo(-r*.5,-r*.02,0,-r*.56);g.fill()}
   else if(type==='magnet'){const R_=r*.3;g.lineWidth=r*.2;g.lineCap='butt';g.beginPath();g.moveTo(-R_,-r*.42);g.lineTo(-R_,0);g.arc(0,0,R_,Math.PI,0,true);g.lineTo(R_,-r*.42);g.stroke()}
+  else if(type==='mirror'){const[dr,dc]=dir||[0,-1];g.save();g.rotate(Math.atan2(dr,dc));
+    // an arrow pointing at the coin it copies, with the mirror's bar behind it
+    g.beginPath();g.moveTo(r*.6,0);g.lineTo(r*.12,-r*.36);g.lineTo(r*.12,r*.36);g.closePath();g.fill();g.fillRect(-r*.2,-r*.11,r*.36,r*.22);
+    g.fillRect(-r*.5,-r*.42,r*.16,r*.84);g.restore()}
   else if(type==='crown'){g.beginPath();[[-.5,.32],[-.5,-.28],[-.25,.02],[0,-.44],[.25,.02],[.5,-.28],[.5,.32]].forEach(([x,y],i)=>i?g.lineTo(x*r,y*r):g.moveTo(x*r,y*r));g.closePath();g.fill()}
 }
 function drawCoin(c){
@@ -718,12 +792,30 @@ function drawCoin(c){
   ctx.lineWidth=Math.max(2,r*.07);ctx.beginPath();ctx.ellipse(0,0,ew*.8,r*.8,0,0,7);ctx.stroke();
   if(w>.35&&!dim&&!blank){ctx.fillStyle='rgba(255,255,255,.5)';ctx.beginPath();ctx.ellipse(-r*.3*w,-r*.54,r*.25*w,r*.11,-.45,0,7);ctx.fill()}
   if(w>.25){ctx.save();ctx.scale(w,1);ctx.fillStyle='#111';ctx.textAlign='center';ctx.textBaseline='middle';
-    if(blank){if(spec){ctx.globalAlpha*=.55;glyph(ctx,typ,r*.8);ctx.globalAlpha/=.55}else{ctx.font=`${Math.round(r*.8)}px "Archivo Black", Impact, sans-serif`;ctx.fillText('?',0,r*.05)}}
-    else if(Hd)glyph(ctx,typ,r);
+    if(blank){if(spec){const a_=typ==='mirror'?1:.55;ctx.globalAlpha*=a_;glyph(ctx,typ,r*.8,c.mdir);ctx.globalAlpha/=a_}else{ctx.font=`${Math.round(r*.8)}px "Archivo Black", Impact, sans-serif`;ctx.fillText('?',0,r*.05)}}
+    else if(Hd)glyph(ctx,typ,r,c.mdir);
     else{ctx.lineWidth=Math.max(2,r*.1);ctx.beginPath();ctx.moveTo(-r*.22,-r*.22);ctx.lineTo(r*.22,r*.22);ctx.moveTo(r*.22,-r*.22);ctx.lineTo(-r*.22,r*.22);ctx.stroke()}
     ctx.restore()}
   ctx.restore();
 }
+// machine parts: chunky hex nuts with a glyph each
+function drawPart(g,id,R,lw=3){const p=PARTS[id],P=Array.from({length:6},(_,i)=>{const a=i*Math.PI/3;return[Math.cos(a)*R,Math.sin(a)*R*.94]});
+  chunkBase(g,P,R*.24,p.col,lw);ptsPath(g,P);g.fillStyle=p.col;g.fill();g.lineWidth=lw;g.strokeStyle=th.line;g.stroke();
+  g.fillStyle='#111';g.strokeStyle='#111';g.textAlign='center';g.textBaseline='middle';g.lineCap='round';g.lineJoin='round';
+  const tx=(t,k)=>{g.font=`${Math.round(R*k)}px "Archivo Black", Impact, sans-serif`;g.fillText(t,0,R*.06)};
+  if(id==='cascade'){g.lineWidth=Math.max(2,R*.17);[-.3,.12].forEach(y=>{g.beginPath();g.moveTo(-R*.36,y*R-R*.1);g.lineTo(0,y*R+R*.2);g.lineTo(R*.36,y*R-R*.1);g.stroke()})}
+  else if(id==='sevens')tx('7',1.05);
+  else if(id==='overclock')tx('×2',.7);
+  else if(id==='echo'){g.lineWidth=Math.max(2,R*.14);g.beginPath();g.arc(-R*.32,0,R*.1,0,7);g.fill();[.32,.56].forEach(q=>{g.beginPath();g.arc(-R*.32,0,R*q,-.8,.8);g.stroke()})}
+  else if(id==='net'){g.lineWidth=Math.max(1.5,R*.1);for(const k of[-.26,0,.26]){g.beginPath();g.moveTo(k*R,-R*.4);g.lineTo(k*R,R*.4);g.stroke();g.beginPath();g.moveTo(-R*.4,k*R);g.lineTo(R*.4,k*R);g.stroke()}}
+  else if(id==='consol')tx('+1',.75);
+}
+function partIcon(c,id,size){const g=c.getContext('2d');c.width=c.height=size*2;g.scale(2,2);g.translate(size/2,size/2-size*.04);drawPart(g,id,size*.36,3)}
+const PJ={};function partJ(id){return PJ[id]||(PJ[id]=world.add(new Juicy(W-30,UI.pipY+10,{k:500,z:.35})))}
+function partHit(id,label){const j=partJ(id);j.punch(16).wobble(.5);sfx.ping();if(J&&label!==false)world.popText(label||PARTS[id].name.toUpperCase(),j.p.x.x-20,j.p.y.x+36,{size:18,ci:4,layers:2,life:1})}
+function drawParts(){const n=S.parts.length;if(!n)return;const R=Math.round(13*Math.max(.85,UI.k)),gp=R*2+8,y=UI.pipY+R*.7;
+  S.parts.forEach((id,i)=>{const j=partJ(id);j.moveTo(trayX+trayW-R-8-(n-1-i)*gp,y);const s=Math.max(0,j.s.x);
+    ctx.save();ctx.translate(j.p.x.x,j.p.y.x);ctx.rotate(j.r.x);ctx.scale(s,s);drawPart(ctx,id,R,2.5);ctx.restore()})}
 function drawBar(){
   const k=UI.k,g=need(),t=barJ.xf(),chip=Math.round(58*k),bw=Math.min(300*k,W-110),bh=Math.max(26,Math.round(32*k)),x0=-bw/2+chip/2+4,p=Math.min(1,score.shown/g),step=cycleIndex(),full=score.value>=g;
   ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);
@@ -774,7 +866,7 @@ function draw(){
   if(!S.presses){ctx.fillStyle=th.hint;ctx.font='700 14px "Space Grotesk", sans-serif';ctx.textAlign='center';ctx.fillText('tap FLIP and watch it play out',W/2,playBot-24)}
   dice.forEach(drawDie);fading.forEach(drawCoin);coins.forEach(c=>{if(!tease||c!==tease.c)drawCoin(c)});drawLines();if(tease)drawCoin(tease.c);
   world.drawCoins(ctx);
-  drawBar();drawPips();
+  drawBar();drawPips();drawParts();
   drawSticker(ctx,hudJ,score.text,Math.min(56*UI.k,W/7));
   world.drawPops(ctx);
 }
@@ -812,7 +904,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126030706';let updShown=false,updDismissed='';
+const BUILD='20261126033704';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -851,7 +943,7 @@ $('#tSkin').addEventListener('click',()=>{skin=skin==='dark'?'light':'dark';appl
 applySkin();
 let resetArm=0;
 $('#tReset').addEventListener('click',e=>{const b=e.currentTarget;if(performance.now()-resetArm>2500){resetArm=performance.now();b.textContent='Tap again to reset';return}
-  b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
+  b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   lvlOpen=false;lvDelay=-1;lvlEl.classList.remove('open');over=false;overDelay=-1;$('#over').classList.remove('open');
   S.sides=[];dice.forEach(d=>world.items.delete(d.j));dice=[];clearCoins();events=[];setBusy(false);save();layout();
   const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)]});
