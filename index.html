@@ -455,6 +455,9 @@ const RW=[10,4.5,1.6];
 function drawOffers(){
   const avail=POOL.filter(p=>p.lvl()<p.max&&(!p.dice||S.dice>0)&&(!p.ok||p.ok())),out=[];
   if(!S.dice){const d=avail.find(p=>p.id==='d6');if(d)out.push(d)}
+  // every level-up after the first die shows one special coin: rarity matters less here, and types you don't own yet are favoured
+  else{const cs=avail.filter(p=>p.coin),cw=p=>[3,2,1][p.r]*(countOf(p.coin)?1:2.5);let t=cs.reduce((a,p)=>a+cw(p),0)*Math.random();
+    for(const p of cs){t-=cw(p);if(t<=0){out.push(p);break}}}
   while(out.length<3){const left=avail.filter(p=>!out.includes(p));if(!left.length)break;
     const wt=p=>RW[p.r]*(p.w||1);let t=left.reduce((a,p)=>a+wt(p),0)*Math.random();for(const p of left){t-=wt(p);if(t<=0){out.push(p);break}}}
   return out.sort(()=>Math.random()-.5);
@@ -1383,7 +1386,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126175958';let updShown=false,updDismissed='';
+const BUILD='20261126182354';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
