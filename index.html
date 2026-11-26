@@ -76,6 +76,7 @@ button{font:inherit;color:var(--ink)}
 .steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;font:600 15px/1.45 "Space Grotesk",sans-serif}
 .steps li::before{content:counter(s);width:34px;height:34px;display:grid;place-items:center;border:3px solid var(--line);border-radius:50%;background:#ffe14d;color:#111;font:16px/1 "Archivo Black",sans-serif;box-sizing:border-box}
 .ki{display:inline-flex;align-items:center;gap:4px;min-height:24px;padding:1px 7px;margin:1px 2px;border:2px solid var(--line);border-radius:7px;background:var(--btn);color:#111;font:700 13px/1.2 "Space Grotesk",sans-serif;vertical-align:middle;box-sizing:border-box}
+.alt{border:2px dashed var(--line);border-radius:12px;padding:10px 12px;font:600 14px/1.45 "Space Grotesk",sans-serif;color:var(--ink)}.alt summary{cursor:pointer;font-weight:700}.alt ul{margin:8px 0 0;padding-left:18px;display:grid;gap:6px}
 .perks{display:flex;flex-wrap:wrap;gap:6px}.perks span{padding:5px 10px;border:2px solid var(--line);border-radius:999px;background:var(--surf);color:var(--ink);font:700 12px/1 "Space Grotesk",sans-serif}
 .faces{display:flex;flex-wrap:wrap;gap:8px}.face{min-width:34px;height:34px;padding:0 4px;box-sizing:border-box;display:grid;place-items:center;border:3px solid var(--line);border-radius:9px;background:var(--surf);color:var(--ink);font:14px/1 "Archivo Black",sans-serif;box-shadow:0 3px 0 var(--line)}
 .face.fx{color:#fff}.face.max{outline:3px solid #ff4b3e;outline-offset:2px}.face.dead{opacity:.3}.face.cur{transform:translateY(-4px);box-shadow:0 7px 0 var(--line)}
@@ -1159,7 +1160,9 @@ let bip=null;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();bip=e;refreshInstall()});
 addEventListener('appinstalled',()=>{bip=null;closeInst();refreshInstall()});
 if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-// what we're running on, so the install steps match the actual phone/computer and browser
+// what we're running on, so the install steps match the actual phone/computer, OS version and browser.
+// Browsers hide some of this: iOS 26 Safari reports iOS 18.6 (its own Safari version tracks iOS instead), and Chrome
+// reports every Android phone as Android 10 (the real version comes from its client hints, read in refineDevice).
 function device(){
   const ua=navigator.userAgent,iPadOS=/Macintosh/.test(ua)&&navigator.maxTouchPoints>1,ios=/iPhone|iPad|iPod/.test(ua)||iPadOS,android=/Android/.test(ua);
   const inapp=/FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|TikTok|musical_ly|Snapchat|; wv\)/.test(ua);
@@ -1168,40 +1171,81 @@ function device(){
   if(inapp)browser='inapp';
   const kind=ios?(iPadOS||/iPad/.test(ua)?'ipad':'iphone'):android?(/Mobile/.test(ua)?'android-phone':'android-tablet'):'desktop';
   const os=ios?'ios':android?'android':/Mac/.test(ua)?'mac':/CrOS/.test(ua)?'chromeos':/Win/.test(ua)?'windows':/Linux/.test(ua)?'linux':'other';
-  return{ios,android,mobile:ios||android,kind,os,browser,sv:+((ua.match(/Version\/(\d+)/)||[])[1]||0),
+  const num=re=>{const m=ua.match(re);return m?+(m[1]+'.'+(m[2]||0)):0};
+  const sv=num(/Version\/(\d+)(?:\.(\d+))?/);
+  const bv=Math.floor(browser==='safari'?sv:browser==='chrome'?num(/(?:Chrome|CriOS)\/(\d+)/):browser==='edge'?num(/(?:Edg|EdgA|EdgiOS)\/(\d+)/):browser==='firefox'?num(/(?:Firefox|FxiOS)\/(\d+)/)
+    :browser==='samsung'?num(/SamsungBrowser\/(\d+)/):browser==='opera'?num(/OPR\/(\d+)/):0);
+  // OS version, and whether it's exact or only a floor
+  let osv=0,osMin=false;
+  if(ios){osv=num(/OS (\d+)[_.](\d+)/);
+    // Safari's own version tracks the OS: it fills in iPads (which report as Macs) and iOS 26+ (which reports 18.6)
+    if(browser==='safari'&&(sv>=26||!osv))osv=Math.floor(sv);else if(osv===18.6){osMin=true}}
+  else if(android){osv=num(/Android (\d+)(?:\.(\d+))?/);if(/Android 10; K\)/.test(ua))osMin=true}
+  else if(os==='mac'||os==='windows')osMin=true; // desktop browsers freeze these; client hints may fix it
+  return{ios,android,mobile:ios||android,kind,os,browser,sv,bv,osv,osMin,
     standalone:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}}
 const DEV=device();
+// Chromium browsers can tell us the real OS version on request
+DEV.ready=(async()=>{try{const h=navigator.userAgentData;if(!h||!h.getHighEntropyValues)return;const v=await h.getHighEntropyValues(['platformVersion']),pv=v.platformVersion||'',pf=h.platform||'';if(!pv)return;
+  // only trust the hint when it agrees with the detected OS
+  if((DEV.android&&pf!=='Android')||(DEV.os==='windows'&&pf!=='Windows')||(DEV.os==='mac'&&pf!=='macOS'))return;
+  const [a,b]=pv.split('.').map(Number);
+  if(DEV.android){DEV.osv=a;DEV.osMin=false}
+  else if(DEV.os==='windows'&&a>0){DEV.osv=a>=13?11:10;DEV.osMin=false}
+  else if(DEV.os==='mac'){DEV.osv=a+(b?b/10:0);DEV.osMin=false}}catch(e){}})();
 const SHARE='<svg width="13" height="15" viewBox="0 0 14 16" aria-hidden="true"><path d="M7 1v9M3.5 4.5 7 1l3.5 3.5M2.5 7.5H1.5v7h11v-7h-1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
 const ki=x=>`<span class="ki">${x}</span>`;
-function installSteps(){const d=DEV,b=d.browser;
+const MACN={11:'Big Sur',12:'Monterey',13:'Ventura',14:'Sonoma',15:'Sequoia',26:'Tahoe'};
+function osLabel(){const d=DEV,v=d.osv,f=x=>String(+x.toFixed(1)).replace(/\.0$/,'');
+  if(d.ios){const n=d.kind==='ipad'?'iPadOS':'iOS';return v?`${n} ${f(v)}${d.osMin?' or later':''}`:n}
+  if(d.android)return v&&!d.osMin?`Android ${f(v)}`:'Android';
+  if(d.os==='windows')return !d.osMin&&v?`Windows ${v}`:'Windows';
+  if(d.os==='mac'){const m=Math.floor(v);return !d.osMin&&v?`macOS ${MACN[m]||f(v)}`:'macOS'}
+  return {chromeos:'ChromeOS',linux:'Linux'}[d.os]||''}
+// steps for this device; alt = other routes for when the screen doesn't match (layouts and versions vary)
+function installSteps(){const d=DEV,b=d.browser,v=d.osv,share=ki(SHARE+' Share'),a2h=ki('Add to Home Screen'),add=ki('Add');
   if(d.standalone)return{done:true};
   if(bip)return{native:true};
   if(b==='inapp')return{steps:[d.ios?`Tap ${ki('···')} or ${ki(SHARE)} and choose ${ki('Open in Safari')}`:`Tap ${ki('⋮')} and choose ${ki('Open in Chrome')} (or your browser)`,'Open this menu again there for the install steps'],
-    note:"You're in an app's built-in browser (Instagram, TikTok and so on), which can't install games."};
+    note:"You're in an app's built-in browser (Instagram, TikTok and so on), which can't install games.",alt:[`Or copy this page's address and paste it into ${d.ios?'Safari':'Chrome'}`]};
   if(d.ios){
-    if(b==='safari'&&d.sv>=26)return{steps:[`Tap ${ki('···')} next to the address bar`,`Tap ${ki(SHARE+' Share')}`,`Scroll down and tap ${ki('Add to Home Screen')}`,`Keep ${ki('Open as Web App')} on and tap ${ki('Add')}`]};
-    if(b==='safari')return{steps:[`Tap ${ki(SHARE+' Share')} ${d.kind==='ipad'?'at the top of the screen':'at the bottom of the screen'}`,`Scroll down and tap ${ki('Add to Home Screen')}`,`Tap ${ki('Add')}`]};
-    if(b==='chrome')return{steps:[`Tap ${ki(SHARE+' Share')} in the address bar`,`Tap ${ki('Add to Home Screen')}`,`Tap ${ki('Add')}`],note:"Needs iOS 16.4 or later. If you don't see it, open this page in Safari."};
-    return{steps:[`Open the browser menu and tap ${ki(SHARE+' Share')}`,`Tap ${ki('Add to Home Screen')}`,`Tap ${ki('Add')}`],note:"If it isn't there, open this page in Safari and add it from there."}}
+    const old=v&&!d.osMin&&v<16.4;
+    if(b==='safari'){
+      if(v>=26)return{steps:[`Tap ${ki('···')} at the end of the address bar`,`Tap ${share}`,`Scroll down and tap ${a2h}`,`Keep ${ki('Open as Web App')} on and tap ${add}`],
+        alt:[`See ${share} right in the toolbar (Bottom or Top tab layout)? Tap it, then ${a2h} → ${add}`,`Toolbar hidden? Scroll up a little to bring it back`]};
+      if(d.kind==='ipad')return{steps:[`Tap ${share} at the top right, next to the address bar`,`Scroll down and tap ${a2h}`,`Tap ${add}`],alt:[`No Share button? Tap the address bar once, then look again`]};
+      return{steps:[`Tap ${share} in the bar at the bottom of the screen`,`Scroll down and tap ${a2h}`,`Tap ${add}`],
+        alt:[`Bar hidden? Scroll up a little or tap the bottom edge to bring it back`,`Address bar at the top? Share is still in the bottom toolbar`]}}
+    if(old)return{steps:[`Copy this page's address`,`Open ${ki('Safari')} and paste it`,`In Safari tap ${share} → ${a2h} → ${add}`],
+      note:`On ${osLabel()} only Safari can add web apps to the Home Screen (other browsers need iOS 16.4 or later).`};
+    if(b==='chrome')return{steps:[`Tap ${share} in the address bar`,`Tap ${a2h}`,`Tap ${add}`],alt:[`Or tap ${ki('···')} → ${share} → ${a2h}`,`Still missing? Open this page in Safari and add it from there`]};
+    if(b==='firefox')return{steps:[`Tap ${ki('☰')} at the bottom right`,`Tap ${share}`,`Tap ${a2h} → ${add}`],alt:[`Still missing? Open this page in Safari and add it from there`]};
+    return{steps:[`Tap ${ki('···')}`,`Tap ${share}`,`Tap ${a2h} → ${add}`],alt:[`Still missing? Open this page in Safari and add it from there`]}}
   if(d.android){
-    if(b==='samsung')return{steps:[`Tap ${ki('☰')} at the bottom right`,`Tap ${ki('Add page to')}`,`Choose ${ki('Home screen')}`]};
-    if(b==='firefox')return{steps:[`Tap ${ki('⋮')}`,`Tap ${ki('Add app to Home screen')} (or ${ki('Install')})`,`Confirm with ${ki('Add')}`]};
-    if(b==='chrome')return{steps:[`Tap ${ki('⋮')} at the top right`,`Tap ${ki('Add to home screen')} (or ${ki('Install app')})`,`Tap ${ki('Install')}`]};
-    return{steps:['Open the browser menu',`Tap ${ki('Add to home screen')} or ${ki('Install')}`,'Confirm']}}
-  if(b==='chrome')return{steps:['Click the install icon at the right end of the address bar',`Or open ${ki('⋮')} → ${ki('Cast, save, and share')} → ${ki('Install page as app')}`]};
-  if(b==='edge')return{steps:['Click the app icon at the right end of the address bar',`Or open ${ki('···')} → ${ki('Apps')} → ${ki('Install this site as an app')}`]};
-  if(b==='safari'&&d.os==='mac')return{steps:[`In the menu bar choose ${ki('File')} → ${ki('Add to Dock')}`,`Click ${ki('Add')}`],note:'Needs macOS Sonoma or later.'};
+    if(b==='samsung')return{steps:[`Tap ${ki('☰')} at the bottom right`,`Tap ${ki('Add page to')}`,`Choose ${ki('Home screen')}`],alt:[`See an install icon in the address bar? Tap it and choose ${ki('Install')}`]};
+    if(b==='firefox')return{steps:[`Tap ${ki('⋮')}`,`Tap ${ki('Add app to Home screen')}`,`Tap ${ki('Add')}`],alt:[`Older Firefox calls it ${ki('Install')} or ${ki('Add to Home screen')}`]};
+    if(b==='chrome')return{steps:[`Tap ${ki('⋮')} at the top right`,`Tap ${ki('Add to home screen')}`,`Choose ${ki('Install')}, then ${ki('Install')} again`],
+      alt:[`Some versions show ${ki('Install app')} in the ⋮ menu instead`,`Address bar at the bottom? The ⋮ menu is down there too`]};
+    return{steps:['Open the browser menu',`Tap ${ki('Add to home screen')} or ${ki('Install')}`,'Confirm'],alt:[`Can't find it? Open this page in Chrome`]}}
+  if(b==='chrome')return{steps:['Click the install icon at the right end of the address bar',`Click ${ki('Install')}`],
+    alt:[`Or open ${ki('⋮')} → ${ki('Cast, save, and share')} → ${ki('Install page as app')}`,`Older Chrome: ${ki('⋮')} → ${ki('Install Odds Engine')}`]};
+  if(b==='edge')return{steps:['Click the app icon at the right end of the address bar',`Click ${ki('Install')}`],alt:[`Or open ${ki('···')} → ${ki('Apps')} → ${ki('Install this site as an app')}`]};
+  if(b==='safari'&&d.os==='mac'){
+    if(d.bv&&d.bv<17)return{steps:[],note:`Safari ${d.bv} can't add web apps to the Dock (it needs Safari 17 on macOS Sonoma or later). Update macOS, or use Chrome or Edge.`};
+    return{steps:[`In the menu bar choose ${ki('File')} → ${ki('Add to Dock')}`,`Click ${add}`],alt:[`Or click ${ki(SHARE)} in the toolbar → ${ki('Add to Dock')}`],note:d.osMin?'Needs macOS Sonoma or later.':''}}
   return{steps:[],note:"This browser can't install web apps. Open the game in Chrome or Edge to install it, or just bookmark it."}}
 function devLabel(){const d=DEV,K={iphone:'iPhone',ipad:'iPad','android-phone':'Android phone','android-tablet':'Android tablet',desktop:{mac:'Mac',windows:'Windows PC',chromeos:'Chromebook',linux:'Linux PC'}[d.os]||'Computer'},
-  B={safari:'Safari',chrome:'Chrome',firefox:'Firefox',edge:'Edge',samsung:'Samsung Internet',opera:'Opera',inapp:'in-app browser',other:'browser'};return`${K[d.kind]} · ${B[d.browser]}`}
+  B={safari:'Safari',chrome:'Chrome',firefox:'Firefox',edge:'Edge',samsung:'Samsung Internet',opera:'Opera',inapp:'in-app browser',other:'browser'};
+  return[K[d.kind],osLabel(),B[d.browser]+(d.bv&&d.browser!=='inapp'?' '+d.bv:'')].filter(Boolean).join(' · ')}
 const instDlg=$('#instDlg');
-function openInst(prompted){const r=installSteps(),B=$('#instBody');$('#instDev').textContent='Detected: '+devLabel();B.innerHTML='';
+async function openInst(prompted){await DEV.ready;const r=installSteps(),B=$('#instBody');$('#instDev').textContent='Detected: '+devLabel();B.innerHTML='';
   if(prompted)B.insertAdjacentHTML('beforeend','<p class="note">Enjoying it? Put it on your home screen and it plays like a real app.</p>');
   if(r.done)B.insertAdjacentHTML('beforeend',"<p class=\"note\">You're already playing the installed app.</p>");
   else if(r.native){const b=document.createElement('button');b.className='slab bright mbtn';b.textContent='INSTALL';
     b.addEventListener('click',async()=>{const e=bip;if(!e)return;bip=null;e.prompt();try{const c=await e.userChoice;if(c.outcome==='accepted')closeInst()}catch(_){}refreshInstall()});
     B.appendChild(b);B.insertAdjacentHTML('beforeend','<p class="note">One tap and it lands on your home screen or app list.</p>')}
-  else{if(r.steps.length)B.insertAdjacentHTML('beforeend','<ol class="steps">'+r.steps.map(x=>`<li><span>${x}</span></li>`).join('')+'</ol>');if(r.note)B.insertAdjacentHTML('beforeend',`<p class="note">${r.note}</p>`)}
+  else{if(r.steps.length)B.insertAdjacentHTML('beforeend','<ol class="steps">'+r.steps.map(x=>`<li><span>${x}</span></li>`).join('')+'</ol>');if(r.note)B.insertAdjacentHTML('beforeend',`<p class="note">${r.note}</p>`);
+    if(r.alt&&r.alt.length)B.insertAdjacentHTML('beforeend','<details class="alt"><summary>Steps don\'t match your screen?</summary><ul>'+r.alt.map(x=>`<li>${x}</li>`).join('')+'</ul></details>')}
   $('#instLater').textContent=prompted?'Not now':'Close';instDlg.classList.add('open');setTimeout(()=>$('#instClose').focus({preventScroll:true}),30)}
 function closeInst(){instDlg.classList.remove('open')}
 $('#instClose').addEventListener('click',closeInst);$('#instLater').addEventListener('click',closeInst);instDlg.addEventListener('click',e=>{if(e.target===instDlg)closeInst()});
@@ -1222,7 +1266,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126160253';let updShown=false,updDismissed='';
+const BUILD='20261126160714';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
