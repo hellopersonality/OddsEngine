@@ -299,8 +299,7 @@ const PARTS={
   sevens:{name:'Lucky sevens',r:1,col:'#ff5ca8',desc:'If your dice add up to a multiple of 7, the whole press pays ×2'},
   overclock:{name:'Overclock',r:1,col:'#ff4b3e',desc:'Dice spill twice the coins, but you get 1 fewer press per level'},
   echo:{name:'Echo chamber',r:1,col:'#c39bff',desc:'The first line every press pays double'},
-  net:{name:'Safety net',r:0,col:'#3ddc97',desc:'Tails in the bottom row flip once more'},
-  consol:{name:'Consolation',r:0,col:'#a9b4c4',desc:'Every tails pays 1'}};
+  net:{name:'Safety net',r:0,col:'#3ddc97',desc:'Tails in the bottom row flip once more'}};
 const PSLOTS=3;
 const countOf=t=>S.pouch.filter(x=>x===t).length;
 // plain coins are unlimited; the pouch holds only special coins, and every one of them is played each press
@@ -341,7 +340,7 @@ const POOL=[
   {id:'perf',r:1,max:4,dice:1,name:'Perfectionist',lvl:()=>S.perf-2,desc:()=>`All heads pays ×${S.perf+1} instead of ×${S.perf}`},
   {id:'sixes',r:1,max:4,dice:1,name:'Max roll bonus',lvl:()=>S.sixes/2,desc:()=>`A die's highest roll (6 on a d6, 20 on a d20) adds ${S.sixes+2} bonus coins`},
   {id:'boom',r:1,max:3,dice:1,name:'Exploding dice',lvl:()=>S.boom,desc:()=>S.boom?`Max rolls can explode up to ${S.boom+1} times in a row`:'A max roll explodes: the die rolls again and adds to the count'},
-  ...Object.entries(PARTS).map(([id,q])=>({id:'p_'+id,part:id,r:q.r,w:.6,max:1,dice:id==='consol'?0:1,name:q.name,lvl:()=>hasPart(id)?1:0,desc:()=>q.desc+(S.parts.length>=PSLOTS?'. Parts full: swap one out':'')})),
+  ...Object.entries(PARTS).map(([id,q])=>({id:'p_'+id,part:id,r:q.r,w:.6,max:1,dice:1,name:q.name,lvl:()=>hasPart(id)?1:0,desc:()=>q.desc+(S.parts.length>=PSLOTS?'. Parts full: swap one out':'')})),
   {id:'chain',r:2,max:5,dice:1,name:'Hot streak',lvl:()=>S.chain,desc:()=>`Each heads in a row pays +${S.chain+1} more than the last`}
 ];
 const RW=[10,4.5,1.6];
@@ -563,7 +562,6 @@ function resolveCoin(c){
     if(hasPart('net')&&!c.noAgain&&!c.netted&&ph.botRow!=null&&c.row===ph.botRow){c.netted=true;c.res=resFor(c.type);partJ('net').punch(10).wobble(.4);sfx.again();
       if(J)world.popText('NET!',c.tx,c.ty-c.r*.8,{size:Math.max(18,Math.min(34,c.r*.6)),ci:4,life:.6});at(T+.28,()=>startFlip(c));return}
     c.dim=1;c.j.shove(140);sfx.tails();ph.streak=0;c.final=true;
-    if(hasPart('consol')){ph.tot+=1;payout(c.tx,c.ty,1,1);partJ('consol').punch(5);if(J)world.popText('+1',c.tx,c.ty-c.r*.8,{size:Math.max(16,Math.min(26,c.r*.5)),ci:6,life:.6})}
     if(wasTease){sfx.miss();world.shake(.25);if(J)world.popText('SO CLOSE!',c.tx,c.ty-c.r*1.1,{size:Math.min(44,W/9),layers:2,kick:6,life:1.3,ci:1})}
   }
   if(c.res==='h'&&c.lines)c.lines.forEach(l=>{if(!l.paid&&l.cs.every(o=>o.final&&o.res==='h'))payLine(l)});
@@ -808,7 +806,6 @@ function drawPart(g,id,R,lw=3){const p=PARTS[id],P=Array.from({length:6},(_,i)=>
   else if(id==='overclock')tx('×2',.7);
   else if(id==='echo'){g.lineWidth=Math.max(2,R*.14);g.beginPath();g.arc(-R*.32,0,R*.1,0,7);g.fill();[.32,.56].forEach(q=>{g.beginPath();g.arc(-R*.32,0,R*q,-.8,.8);g.stroke()})}
   else if(id==='net'){g.lineWidth=Math.max(1.5,R*.1);for(const k of[-.26,0,.26]){g.beginPath();g.moveTo(k*R,-R*.4);g.lineTo(k*R,R*.4);g.stroke();g.beginPath();g.moveTo(-R*.4,k*R);g.lineTo(R*.4,k*R);g.stroke()}}
-  else if(id==='consol')tx('+1',.75);
 }
 function partIcon(c,id,size){const g=c.getContext('2d');c.width=c.height=size*2;g.scale(2,2);g.translate(size/2,size/2-size*.04);drawPart(g,id,size*.36,3)}
 const PJ={};function partJ(id){return PJ[id]||(PJ[id]=world.add(new Juicy(W-30,UI.pipY+10,{k:500,z:.35})))}
@@ -904,7 +901,7 @@ function frame(now){
 // ================= update check =================
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261126033704';let updShown=false,updDismissed='';
+const BUILD='20261126034644';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
