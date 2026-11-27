@@ -557,7 +557,9 @@ function layout(first){
   const pr=getComputedStyle($('#probe'));UI.st=parseFloat(pr.paddingTop)||0;
   UI.k=Math.max(.74,Math.min(1.12,Math.min(W/430,(H-UI.st)/880)));
   UI.hudY=UI.st+Math.round(46*UI.k)+(W<520?4:0);UI.barY=UI.st+Math.round(100*UI.k);UI.pipY=UI.st+Math.round(128*UI.k);
-  const uiH=ui.getBoundingClientRect().height;playTop=UI.st+Math.round(158*UI.k);playBot=H-uiH-30;trayW=Math.min(W-(W<520?20:28),660);trayX=W/2-trayW/2;
+  const uiH=ui.getBoundingClientRect().height;playTop=UI.st+Math.round(158*UI.k);playBot=H-uiH-30;
+  // the tray runs down to just above the Pouch / Options row (its 12px side depth plus a small gap)
+  {const pb=$('#pouchBtn').getBoundingClientRect();if(pb.height)playBot=Math.max(playBot,Math.round(pb.top-26))}trayW=Math.min(W-(W<520?20:28),660);trayX=W/2-trayW/2;
   hudJ.moveTo(W/2,UI.hudY);barJ.moveTo(W/2,UI.barY);if(first){hudJ.snap(W/2,UI.hudY);barJ.snap(W/2,UI.barY)}
   // dice sit in zones: one socket per randomizer slot, filled left to right, so free slots show without a label
   const n=line.length,z=n?Math.max(S.slots,n):0,avail=trayW-28;
@@ -1698,7 +1700,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127173031';let updShown=false,updDismissed='';
+const BUILD='20261127173416';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
