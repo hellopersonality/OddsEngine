@@ -40,29 +40,39 @@ button{font:inherit;color:var(--ink)}
 #upd{position:fixed;left:50%;top:calc(58px + var(--top));z-index:8;display:none;align-items:center;gap:10px;padding:8px 8px 8px 14px;translate:-50% 0;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:5px 5px 0 var(--accent);animation:slam .4s cubic-bezier(.2,1.7,.4,1)}
 #upd.open{display:flex}#upd button{--dp:3px;min-height:36px;padding:4px 12px;font-weight:700;cursor:pointer}
 #updGo{background:var(--yellow)}
-/* the PLAY button is a coin-op box in the middle of the tray: tokens stack beside it, tap to drop one in the slot */
-#go{position:fixed;z-index:2;left:50%;top:50%;translate:-50% -50%;--bw:150px;--tw:calc(var(--bw)*.36);width:var(--bw);height:calc(var(--bw)*2.02 + 14px);padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:none;user-select:none;-webkit-user-select:none;transition:opacity .18s,scale .3s cubic-bezier(.3,1.5,.5,1)}
-#goBox{position:absolute;left:0;right:0;top:0;height:calc(var(--bw)*1.12);display:grid;justify-items:center;align-content:center;gap:calc(var(--bw)*.05);border:5px solid var(--line);border-radius:20px;background:var(--yellow);color:#0a0812;box-shadow:0 9px 0 -5px #b89300,0 9px 0 0 var(--line),0 16px 0 0 rgba(0,0,0,.35);transition:transform .05s,box-shadow .05s}
-#goBox::before{content:'';position:absolute;left:10%;top:6px;width:58%;height:5px;border-radius:3px;background:rgba(255,255,255,.55)}
-#go.down #goBox{transform:translateY(7px);box-shadow:0 2px 0 -5px #b89300,0 2px 0 0 var(--line)}
-#goSlit{position:relative;width:calc(var(--bw)*.36);height:calc(var(--bw)*.42);border:4px solid var(--line);border-radius:12px;background:#f7f0e1;display:grid;place-items:center}
-#goSlit::before{content:'';width:22%;height:66%;border-radius:6px;background:#0a0812}
-#goLbl{font:calc(var(--bw)*.2)/1 "Archivo Black",Impact,sans-serif;letter-spacing:.02em}
-#goLeft{padding:3px 8px;border-radius:6px;background:#0a0812;color:var(--yellow);font:700 calc(var(--bw)*.075)/1.2 "Space Grotesk",sans-serif;white-space:nowrap}
-#go.last #goBox{background:#ff1100;box-shadow:0 9px 0 -5px #a80c00,0 9px 0 0 var(--line),0 16px 0 0 rgba(0,0,0,.35)}#go.last #goLeft{color:#ff8a80}
+/* the PLAY button is the machine's front: between plays a coin-op cabinet covers the board (lineup stays visible above it).
+   Swipe a token up into its slot (or tap it) and the whole front slides down out of the tray; it comes back up once the play has settled.
+   Its colours follow the era (set from JS as --cab/--cabHi/--cabLo/--stripe/--tag); tokens and coins never change colour */
+#goWrap{position:fixed;z-index:2;overflow:hidden;pointer-events:none;border-radius:16px}
+#go{--u:1;--bw:calc(var(--u)*139px);--tw:calc(var(--u)*50px);position:absolute;inset:0;padding:calc(var(--u)*14px) 12px 0;border:5px solid var(--line);border-radius:16px;background:var(--cab,#5b45f0);color:#f7f0e1;cursor:pointer;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;box-shadow:inset 0 8px 0 var(--cabHi,#7f6cf5),inset 0 -10px 0 var(--cabLo,#3a27c4);-webkit-tap-highlight-color:transparent;touch-action:none;user-select:none;-webkit-user-select:none;
+  transition:translate .42s cubic-bezier(.3,1.3,.5,1),background-color .6s,box-shadow .6s}
+#go.wait{translate:0 104%;pointer-events:none;transition:translate .28s cubic-bezier(.55,0,.85,.25),background-color .6s,box-shadow .6s}
+#go.hit{animation:frontHit .22s}
+@keyframes frontHit{35%{transform:translateY(calc(var(--u)*6px))}}
+#goLip{position:absolute;left:50%;top:-5px;width:calc(var(--u)*120px);height:14px;translate:-50% 0;border:4px solid var(--line);border-top:0;border-radius:0 0 10px 10px;background:var(--cabLo,#3a27c4)}
+#goStripe{position:absolute;left:0;right:0;top:calc(var(--u)*62px);height:calc(var(--u)*10px);background:var(--stripe,#ff0d7e);border-block:3px solid var(--line)}
+.riv{position:absolute;width:12px;height:12px;border-radius:50%;background:#8c8aa0;border:3px solid var(--line);box-sizing:border-box}
+.riv.a{left:12px;top:14px}.riv.b{right:12px;top:14px}.riv.c{left:12px;bottom:14px}.riv.d{right:12px;bottom:14px}
+#goEng{position:relative;margin-top:calc(var(--u)*18px);font:700 calc(var(--u)*12px)/1 "Space Grotesk",sans-serif;letter-spacing:.04em;color:var(--cabHi,#b8a6ff);opacity:.95}
+#goSlit{position:relative;margin-top:calc(var(--u)*14px);width:calc(var(--u)*92px);height:calc(var(--u)*112px);border:5px solid var(--line);border-radius:16px;background:#f7f0e1;box-shadow:inset 0 -6px 0 #d9d0bd;display:grid;place-items:center;flex:none}
+#goSlit::before{content:'';width:22%;height:66%;border-radius:8px;background:#0a0812}
+#go.down #goSlit{translate:0 3px}#go.hit #goSlit{animation:hit .2s}
+#goLbl{margin-top:calc(var(--u)*12px);font:calc(var(--u)*54px)/1 "Archivo Black",Impact,sans-serif;letter-spacing:.02em;color:#f7f0e1;text-shadow:0 4px 0 var(--line)}
+#goLeft{margin-top:calc(var(--u)*10px);padding:4px 10px;border-radius:7px;background:#0a0812;color:var(--yellow);font:700 calc(var(--u)*14px)/1.2 "Space Grotesk",sans-serif;white-space:nowrap}
+#go.last #goLeft{background:#ff1100;color:#fff}
 #go.cal #goLeft{color:#00dc7d}
-/* the tokens wait in a tray at the foot of the box: swipe the top one up into the slot (or tap) */
-/* the swipe zone is much wider than the tray (and reaches a little below it), so any thumb, either hand, any grip, can catch it */
-#goStack{position:absolute;left:50%;bottom:calc(var(--bw)*-.3);translate:-50% 0;width:var(--sw,calc(var(--bw)*.9));height:calc(var(--bw)*1.14)}
-#goTray{position:absolute;left:50%;bottom:calc(var(--bw)*.3);translate:-50% 0;width:calc(var(--tw)*1.75);height:calc(var(--bw)*.13);border:4px solid var(--line);border-radius:10px;background:#2a2340;box-shadow:inset 0 4px 0 rgba(0,0,0,.45),0 5px 0 var(--line)}
+/* the coin cup: the bottom of the front, full width, is the swipe zone so any thumb and any grip can catch it */
+#goStack{position:absolute;left:0;right:0;bottom:0;height:calc(var(--bw)*1.05)}
+#goTray{position:absolute;left:50%;bottom:calc(var(--bw)*.16);translate:-50% 0;width:calc(var(--tw)*3);height:calc(var(--bw)*.16);border:4px solid var(--line);border-radius:12px;background:#1a1629;box-shadow:inset 0 5px 0 rgba(0,0,0,.5)}
 #goStack .tok{left:calc(50% - var(--tw)/2)}
-#goCount{position:absolute;left:calc(50% + var(--tw)*.68);font:calc(var(--tw)*.42)/1 "Archivo Black",sans-serif;color:var(--ink);text-shadow:0 2px 0 var(--line);white-space:nowrap}
+#goCount{position:absolute;left:calc(50% + var(--tw)*.75);font:calc(var(--tw)*.42)/1 "Archivo Black",sans-serif;color:#f7f0e1;text-shadow:0 2px 0 var(--line);white-space:nowrap}
 .tok.lift{visibility:hidden}
-/* first-run callout: a ghost token rides up from the tray into the slot */
+/* first-run callout: a ghost token rides up from the cup into the slot */
 #goHint{position:absolute;inset:0;pointer-events:none;display:none}#go.hint #goHint{display:block}
-#goHint i{position:absolute;left:calc(50% - var(--tw)/2);bottom:calc(var(--bw)*.5);width:var(--tw);height:calc(var(--tw)*.4);border-radius:50%;border:3px dashed var(--ink);opacity:0;animation:hintUp 1.6s cubic-bezier(.4,0,.3,1) infinite}
-#goHint b{position:absolute;right:calc(50% + var(--tw)*.75);bottom:calc(var(--bw)*.3);padding:5px 8px;border:3px solid var(--line);border-radius:8px;background:#00b7f0;color:#0a0812;font:12px/1 "Archivo Black",sans-serif;white-space:nowrap;box-shadow:0 3px 0 var(--line);rotate:-6deg}
-@keyframes hintUp{0%{translate:0 0;opacity:0}15%{opacity:.9}70%{translate:0 calc(var(--bw)*-1.05);opacity:.9;scale:.8}100%{translate:0 calc(var(--bw)*-1.05);opacity:0;scale:.7}}
+#goHint i{position:absolute;left:calc(50% - var(--tw)/2);bottom:calc(var(--bw)*.75);width:var(--tw);height:calc(var(--tw)*.4);border-radius:50%;border:3px dashed #f7f0e1;opacity:0;animation:hintUp 1.6s cubic-bezier(.4,0,.3,1) infinite}
+#goHint b{position:absolute;left:calc(var(--u)*20px);bottom:calc(var(--bw)*.62);padding:6px 9px;border:3px solid var(--line);border-radius:8px;background:var(--tag,#00b7f0);color:#0a0812;font:calc(var(--u)*12px)/1 "Archivo Black",sans-serif;white-space:nowrap;box-shadow:0 3px 0 var(--line);rotate:-6deg}
+@keyframes hintUp{0%{translate:0 0;opacity:0}15%{opacity:.9}70%{translate:0 calc(var(--hy,200px)*-1);opacity:.9;scale:.8}100%{translate:0 calc(var(--hy,200px)*-1);opacity:0;scale:.7}}
 .tok{position:absolute;left:0;width:var(--tw);height:calc(var(--tw)*.4);border-radius:50%;background:#ffd400;border:3px solid var(--line);box-sizing:border-box;box-shadow:0 calc(var(--tw)*.13) 0 -3px #b38f00,0 calc(var(--tw)*.13) 0 0 var(--line)}
 .tok::after{content:'';position:absolute;left:22%;top:18%;width:30%;height:28%;border-radius:50%;background:rgba(255,255,255,.6)}
 .tok.free{background:#00b7f0;box-shadow:0 calc(var(--tw)*.13) 0 -3px #007aa3,0 calc(var(--tw)*.13) 0 0 var(--line)}
@@ -80,8 +90,6 @@ button{font:inherit;color:var(--ink)}
 #over .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(8px,2.5vw,12px);width:100%;max-width:520px}
 #over .stat{padding:12px 6px;text-align:center;overflow:hidden}#over .stat b{display:block;white-space:nowrap;overflow:hidden;font:30px/1.1 "Archivo Black",sans-serif}#over .stat span{display:block;font-size:13px;line-height:1.25;font-weight:700;color:var(--muted);text-wrap:balance}
 #again{min-height:64px;padding:10px 34px;font:28px/1 "Archivo Black",sans-serif;background:var(--yellow);cursor:pointer}
-#go.wait{opacity:0;scale:.55;pointer-events:none}
-#go.ready{animation:ready .35s cubic-bezier(.2,1.8,.4,1)}#go.hit #goBox{animation:hit .2s}
 @keyframes ready{40%{scale:1.05 1.1}}
 @keyframes hit{35%{scale:1.03 .92}70%{scale:.99 1.04}}
 :focus-visible{outline:3px dashed var(--ink);outline-offset:4px}
@@ -153,7 +161,6 @@ button{font:inherit;color:var(--ink)}
 @keyframes float{0%,100%{translate:0 0}50%{translate:0 -4px}}
 @keyframes spinG{to{transform:rotate(360deg)}}
 @keyframes shine{from{background-position:120% 0}to{background-position:-120% 0}}
-.amb #go:not(.ready):not(.hit):not(.wait):not(.down){animation:breathe 3.6s ease-in-out infinite}
 .amb #pouchBtn:not(.bump){animation:bob 5.2s ease-in-out infinite}
 .amb #optBtn{animation:bob 6.1s ease-in-out -2s infinite}
 .amb #lvBox h2,.amb #ovBox h2{animation:slam .45s cubic-bezier(.2,1.7,.4,1),sway 3.4s ease-in-out .45s infinite}
@@ -202,7 +209,7 @@ button{font:inherit;color:var(--ink)}
   <div id="instBody" style="display:grid;gap:12px"></div>
   <button id="instLater" class="slab mbtn sec" style="min-height:48px;font-size:17px">Not now</button>
 </div></div>
-<div id="ui"></div><button id="go" aria-label="Play"><span id="goStack" aria-hidden="true"></span><span id="goHint" aria-hidden="true"><i></i><b>SWIPE OR TAP ↑</b></span><span id="goBox"><span id="goSlit"></span><span id="goLbl">PLAY</span><span id="goLeft"></span></span></button>
+<div id="ui"></div><div id="goWrap"><button id="go" aria-label="Play"><span id="goStripe"></span><span id="goLip"></span><span class="riv a"></span><span class="riv b"></span><span class="riv c"></span><span class="riv d"></span><span id="goEng">INSERT TOKEN</span><span id="goSlit"></span><span id="goLbl">PLAY</span><span id="goLeft"></span><span id="goStack" aria-hidden="true"></span><span id="goHint" aria-hidden="true"><i></i><b>SWIPE OR TAP ↑</b></span></button></div>
 <div id="lvl" role="dialog" aria-modal="true" aria-labelledby="lvTitle">
   <div id="lvBox">
     <h2 id="lvTitle">LEVEL 2</h2>
@@ -380,7 +387,10 @@ function mixTheme(a,b,t){const o={...b};for(const k in b)if(typeof b[k]==='strin
 let eraNow=-1,eraMix=1,thFrom=null,thTo=null;
 function pushThemeCss(){const rs=document.documentElement.style;rs.setProperty('--bg',th.bg);rs.setProperty('--surf',th.tray);rs.setProperty('--rim',th.rim);rs.setProperty('--rim0',th.rim);if(th.off)rs.setProperty('--off',th.off);
   const m=document.querySelector('meta[name=theme-color]');if(m)m.content=th.bg}
-function syncEra(instant){const e=eraOf(S.lv);if(e===eraNow&&!instant)return;eraNow=e;FX=ERAS[e%ERAS.length].fx;lastPal=null;thTo=themeFor(skin,e);
+// the coin-op front's colourway per era: body, highlight, shade, stripe, tag (never yellow or gold, so tokens and coins pop)
+const CAB=[['#5b45f0','#aea3f8','#260fc0','#ff0d7e','#00b7f0'],['#00a19a','#08fff4','#003b38','#a64dff','#00b7f0'],['#a12bc4','#c874e1','#5c1970','#ff0d7e','#ff1100'],['#1e9447','#40d875','#0d3f1e','#ff9300','#00dc7d'],['#d32218','#ed6b64','#77130e','#ff9300','#ffd400'],['#3d6a9e','#779dca','#213954','#ff1100','#00dc7d'],['#9c1b4e','#de3f7e','#450c23','#ff0d7e','#ff9300']];
+function setCab(e){const c=CAB[e%CAB.length],rs=document.documentElement.style;['--cab','--cabHi','--cabLo','--stripe','--tag'].forEach((k,i)=>rs.setProperty(k,c[i]))}
+function syncEra(instant){const e=eraOf(S.lv);if(e===eraNow&&!instant)return;eraNow=e;setCab(e);FX=ERAS[e%ERAS.length].fx;lastPal=null;thTo=themeFor(skin,e);
   if(instant){th=thTo;eraMix=1;pushThemeCss()}else{thFrom={...th};eraMix=0}}
 // slow crossfade so the shift lands as a mood change, not a cut
 function stepEra(dt){syncEra(false);if(eraMix<1){eraMix=Math.min(1,eraMix+dt/2.2);const t=eraMix*eraMix*(3-2*eraMix);th=mixTheme(thFrom,thTo,t);pushThemeCss()}}
@@ -567,15 +577,19 @@ function updateGoLabel(){const l=S.left,c=calibrating();
 let stackShown=-1,stackKey='',tokFlying=0;
 function renderStack(){const box=$('#goStack'),c=calibrating(),n=c?2:S.left,key=n+'|'+c+'|'+[...freePips].join(',');if(key===stackKey)return;
   const prev=stackShown;stackKey=key;box.innerHTML='<span id="goTray"></span>';
-  const step=.34,base=.2+.83;for(let i=0;i<n;i++){const t=document.createElement('span');t.className='tok'+(!c&&freePips.has(i)?' free':'')+(!c&&n===1?' lastT':'');
+  const step=.34,base=.8;for(let i=0;i<n;i++){const t=document.createElement('span');t.className='tok'+(!c&&freePips.has(i)?' free':'')+(!c&&n===1?' lastT':'');
     t.style.bottom=`calc(var(--tw)*${(base+i*step).toFixed(2)})`;t.style.zIndex=i+1;
     // new tokens drop into the tray (a refill staggers them in once the box is back)
     if(prev>=0&&i>=prev&&!c){t.classList.add('in');t.style.animationDelay=(n-prev>1?.25+(i-prev)*.09:0)+'s'}box.appendChild(t)}
   const lbl=document.createElement('span');lbl.id='goCount';lbl.textContent=c?'∞':'×'+n;lbl.style.bottom=`calc(var(--tw)*${(base+Math.max(0,n-1)*step).toFixed(2)})`;box.appendChild(lbl);
   stackShown=c?-1:n}
-// where the box sits: the middle of the board (the board is empty whenever the box is showing)
-function placeGo(){const top=coinTop,h=Math.max(80,playBot-24-top),bw=Math.round(Math.max(96,Math.min(160,h*.34,trayW*.4)));
-  go.style.setProperty('--bw',bw+'px');go.style.setProperty('--sw',Math.round(Math.min(trayW-24,W-32))+'px');go.style.left=(W/2)+'px';go.style.top=(top+h/2)+'px'}
+// the front covers the board: everything in the tray below the lineup
+const goWrap=$('#goWrap');
+function placeGo(){const bz=9,x=trayX+bz+5,y=coinTop-12,w=trayW-bz*2-10,h=Math.max(120,playBot-bz-5-y);
+  Object.assign(goWrap.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
+  const u=Math.max(.6,Math.min(1.25,h/540,w/330));go.style.setProperty('--u',u.toFixed(3));
+  // how far the hint's ghost token rises: from the cup up to the slot
+  requestAnimationFrame(()=>{const sl=$('#goSlit').getBoundingClientRect(),tr=$('#goStack').getBoundingClientRect();go.style.setProperty('--hy',Math.max(60,(tr.bottom-u*139*.75)-(sl.top+sl.height*.4))+'px')})}
 // a token flying across the screen (as a fixed DOM element so it can cross the canvas and the box)
 function flyTok(x0,y0,x1,y1,cls,dur,done,arc=60){const t=document.createElement('span');t.className='tok tokFly '+(cls||'');const tw=parseFloat(getComputedStyle(go).getPropertyValue('--bw'))*.36;
   t.style.cssText=`--tw:${tw}px;left:${x0-tw/2}px;top:${y0-tw*.2}px`;document.body.appendChild(t);
@@ -651,7 +665,8 @@ function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setIt
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
 function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];S.dp=[];S.charms=[];S.lineup=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   clearLine();clearCoins();addDie(true,6);events=[];busy=false;save();layout();sfx.buy()}
-function refreshGo(){const h=menuOpen||busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
+let goHold=0;
+function refreshGo(){const h=goHold>0||menuOpen||busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
   if(!h){go.classList.remove('ready');void go.offsetWidth;go.classList.add('ready');sfx.ready()}else go.classList.remove('down')}
 function press(){
   if(isPaused()||lvlOpen||lvDelay>=0||busy)return;
@@ -1057,13 +1072,13 @@ function pick(p,swapIdx){
   if(!lvlOpen)return;
   if((p.die||p.charm)&&line.length>=S.slots&&swapIdx===undefined){showSwap(p);return}
   if(p.part&&S.parts.length>=PSLOTS&&swapIdx===undefined){showPartSwap(p);return}
-  lvlOpen=false;lvlEl.classList.remove('open');sfx.buy();hideSwap();maybeAskInstall();
+  lvlOpen=false;lvlEl.classList.remove('open');sfx.buy();goHold=J?1.1:0;hideSwap();maybeAskInstall();
   world.coins=[];const carry=Math.max(0,score.value-need());score.value=score.shown=carry;const wasCalib=calibrating();if(wasCalib)S.budget=BUDGET;S.lv++;S.left=budget();
   if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}
   if(S.lv%4===0)S.rerolls++;freePips.clear();
   hudJ.pop();barJ.punch(12).shove(300);
   // pop-ups sit above the coin-op box, which is back in the middle of the board by now
-  const mid=coinTop+Math.min(60,(playBot-coinTop)*.12);
+  const mid=(coinTop+playBot)/2;
   if(p.coin){S.pouch.push(p.coin);bag=[];pouchBump()}
   else if(p.die){
     if(swapIdx!==undefined){const d=line[swapIdx];
@@ -1512,7 +1527,6 @@ function draw(){
   rr(ctx,trayX+bz,playTop+bz,trayW-bz*2,TH-bz*2,18);ctx.fillStyle=th.tray;ctx.fill();
   ctx.save();ctx.clip();drawBgFx(.5);ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(trayX,playTop+bz,trayW,11);ctx.restore();
   rr(ctx,trayX+bz,playTop+bz,trayW-bz*2,TH-bz*2,18);ctx.lineWidth=4;ctx.strokeStyle=th.line;ctx.stroke();
-  if(!S.presses){ctx.fillStyle=th.hint;ctx.font='700 14px "Space Grotesk", sans-serif';ctx.textAlign='center';ctx.fillText(touchy?'swipe a token up into the slot, or tap PLAY':'tap PLAY and watch it play out',W/2,playBot-24)}
   drawZones();line.forEach(o=>{if(!o.dragging)o.charm?drawCharm(o):drawDie(o)});fading.forEach(drawCoin);coins.forEach(c=>{if(!tease||c!==tease.c)drawCoin(c)});drawLines();if(tease)drawCoin(tease.c);
   world.drawCoins(ctx);
   line.forEach(o=>{if(o.dragging)o.charm?drawCharm(o):drawDie(o)});
@@ -1561,6 +1575,7 @@ function frame(now){
     overDelay=.6;sfx.over();if(J){world.popText('OUT OF PLAYS',W/2,(coinTop+playBot)/2,{size:Math.min(46,W/9),layers:3,kick:8,life:1});world.shake(.5)}}
   if(overDelay>=0){overDelay-=raw;if(overDelay<0)openOver()}
   if(lvDelay>=0){lvDelay-=raw;if(lvDelay<0)openLevel()}
+  if(goHold>0)goHold-=raw;
   refreshGo();
   draw();
   const ci=cycleIndex(),pk=J?ci:-1;if(pk!==lastPal){lastPal=pk;const rs=document.documentElement.style;rs.setProperty('--pal',J?pal(ci):'#ffd400');rs.setProperty('--pal2',J?pal(ci+3):'#00b7f0')}
@@ -1683,7 +1698,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127171043';let updShown=false,updDismissed='';
+const BUILD='20261127173031';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1698,7 +1713,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdat
 
 // ================= input =================
 // let one-shot animations finish, then hand back to the idle loop
-go.addEventListener('animationend',e=>{if(e.animationName==='hit'||e.animationName==='ready')go.classList.remove('hit','ready')});
+go.addEventListener('animationend',e=>{if(e.animationName==='hit'||e.animationName==='frontHit'||e.animationName==='ready')go.classList.remove('hit','ready')});
 $('#pouchBtn').addEventListener('animationend',e=>{if(e.animationName==='hit')e.currentTarget.classList.remove('bump')});
 cardsEl.addEventListener('animationend',e=>{const c=e.target.closest('.card');if(c&&e.animationName==='flipIn'){c.style.setProperty('--fd',(-Math.random()*3).toFixed(2)+'s');c.classList.add('idle')}});
 function syncAmb(){document.documentElement.classList.toggle('amb',amb())}syncAmb();
