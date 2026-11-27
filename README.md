@@ -3,7 +3,7 @@
 A juicy, neo-brutalist chance machine for the browser. One play sets the whole machine in motion: dice tumble and land, spill piles of coins, and the coins flip one by one into your score.
 
 ## How it plays
-- **Level 1** is free flips with a single coin. Fill the bar to level up.
+- **Level 1** starts you with a d6 in the first lineup slot and free plays (no limit). Fill the bar to level up. The first level-up offers no legendaries yet, so the first pick stays easy to read.
 - **Level ups** offer three upgrade cards (Common / Rare / Legendary), survivor-style. Rerolls are earned every 4 levels.
 - **Randomizers** (d6 to d20 dice) take up limited slots (5 to start). When full, a new die is swapped in for an old one.
 - **Paylines:** any straight run of 3+ coins in the layout counts: across, down or along either diagonal. All heads pays a multiplier. When a line is one coin away, the machine pauses for a tease.

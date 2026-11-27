@@ -440,6 +440,8 @@ const score=new CountUp(0);
 const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');if(Array.isArray(d.parts))S.parts=d.parts.filter(id=>PARTS[id]).slice(0,PSLOTS);if(Array.isArray(d.fx))S.fx=d.fx.map(x=>FXD[x]?x:'');if(Array.isArray(d.charms))S.charms=d.charms.map(c=>c&&c.id==='ladder'?{...c,id:'pair'}:c).filter(c=>c&&CH[c.id]).map(c=>({id:c.id,v:+c.v||0}));if(Array.isArray(d.lineup))S.lineup=d.lineup.filter(k=>k==='c'||k==='d');
   // older saves had shared die upgrades: every die owned then keeps them
   S.dp=Array.isArray(d.dp)?d.dp.map(o=>({boom:+o.boom||0,reb:+o.reb?1:0,min:Math.max(1,+o.min||1),six:+o.six||0})):(d.sides||[]).map(()=>({boom:+d.boom||0,reb:+d.rebate?1:0,min:Math.max(1,+d.minFace||1),six:+d.sixes||0}));score.value=score.shown=+d.score||0}}catch(e){}
+// every run starts with a d6 in the first slot: level 1 plays like the rest of the game
+if(S.dice<1){S.dice=1;S.sides=[6];S.lineup=['d',...S.lineup]}
 S.sides=S.sides.slice(0,S.dice);while(S.sides.length<S.dice)S.sides.push(6);
 S.dp=S.dp.slice(0,S.dice);while(S.dp.length<S.dice)S.dp.push(newPerks());
 S.fx=S.fx.slice(0,S.dice);while(S.fx.length<S.dice)S.fx.push('');S.fx=S.fx.map((x,i)=>x&&FXD[x].sides===S.sides[i]?x:'');
@@ -482,7 +484,7 @@ const POOL=[
 const dlv=k=>dice.length?Math.min(...dice.map(d=>d.p[k])):0;
 const RW=[10,4.5,1.6];
 function drawOffers(){
-  const avail=POOL.filter(p=>p.lvl()<p.max&&(!p.dice||S.dice>0)&&(!p.ok||p.ok())),out=[];
+  const avail=POOL.filter(p=>p.lvl()<p.max&&(!p.dice||S.dice>0)&&(!p.ok||p.ok())&&!(S.lv===1&&p.r===2)),out=[];
   if(!S.dice){const d=avail.find(p=>p.id==='d6');if(d)out.push(d)}
   // every level-up after the first die shows one special coin: rarity matters less here, and types you don't own yet are favoured
   else{const cs=avail.filter(p=>p.coin),cw=p=>[3,2,1][p.r]*(countOf(p.coin)?1:2.5);let t=cs.reduce((a,p)=>a+cw(p),0)*Math.random();
@@ -612,7 +614,7 @@ function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setIt
   if(short<=Math.max(2,need()*.2))addLine(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)addLine(`Your machine: ${line.map(o=>o.charm?CH[o.id].name:o.fx?FXD[o.fx].name:'d'+o.sides).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
 function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];S.dp=[];S.charms=[];S.lineup=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
-  clearLine();clearCoins();events=[];busy=false;save();layout();sfx.buy()}
+  clearLine();clearCoins();addDie(true,6);events=[];busy=false;save();layout();sfx.buy()}
 function refreshGo(){const h=menuOpen||busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
   if(!h){go.classList.remove('ready');void go.offsetWidth;go.classList.add('ready');sfx.ready()}else go.classList.remove('down')}
 function press(){
@@ -1645,7 +1647,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127163210';let updShown=false,updDismissed='';
+const BUILD='20261127170028';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1693,7 +1695,7 @@ let resetArm=-1e9;
 $('#tReset').addEventListener('click',e=>{const b=e.currentTarget;if(performance.now()-resetArm>2500){resetArm=performance.now();b.textContent='Tap again to reset';return}
   b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];S.dp=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   lvlOpen=false;lvDelay=-1;lvlEl.classList.remove('open');over=false;overDelay=-1;$('#over').classList.remove('open');
-  S.charms=[];S.lineup=[];clearLine();clearCoins();events=[];setBusy(false);save();layout()});
+  S.charms=[];S.lineup=[];clearLine();clearCoins();addDie(true,6);events=[];setBusy(false);save();layout()});
 addEventListener('resize',()=>layout());
 layout(true);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>layout());
