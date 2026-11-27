@@ -418,7 +418,7 @@ const CH={
   even:{name:'Even Keel',r:0,col:'#00b7f0',g:'2·4',cond:'EVEN',roll:v=>v%2===0,desc:()=>`If the nearest die to its left rolls even: +${fmt(S.val*2)} for every heads`},
   high:{name:'High Roller',r:1,col:'#ff0d7e',g:'×2',cond:'≥5',roll:v=>v>=5,desc:()=>'If the nearest die to its left rolls 5 or more: the play pays ×2'},
   under:{name:'Underdog',r:1,col:'#ff9300',g:'×3',cond:'1–2',roll:v=>v<=2,desc:()=>'If the nearest die to its left rolls 1 or 2: the play pays ×3'},
-  ladder:{name:'Ladder',r:1,col:'#9ef7bb',g:'↗',cond:'RISE',desc:()=>`Counts the dice to its left that rolled higher each time, ending at the nearest one (2, 4, 6 = 3 dice). With 2 or more: +${fmt(S.val*5)} per die counted`},
+  pair:{name:'Lucky Pair',r:1,col:'#9ef7bb',g:'3=3',cond:'PAIR',desc:()=>'If any two of your dice roll the same number: the play pays ×2'},
   clover:{name:'Four-Leaf Clover',r:1,col:'#7ee08a',g:'♣',cond:'4+',desc:()=>'If 4 or more coins land heads: the play pays ×1.5'},
   horse:{name:'Horseshoe',r:1,col:'#ffc984',g:'Ω',cond:'LINE',desc:()=>'If a payline paid this play: the play pays ×2'},
   bell:{name:'Bell',r:1,col:'#ffe884',g:'♪',cond:'←',desc:()=>'Fires the charm to its left a second time, with the same trigger and effect'},
@@ -438,7 +438,7 @@ const S={...FRESH,sides:[],pouch:[...FRESH.pouch],parts:[],fx:[],dp:[],charms:[]
 const newPerks=()=>({boom:0,reb:0,min:1,six:0});
 const hasPart=id=>S.parts.includes(id);
 const score=new CountUp(0);
-const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');if(Array.isArray(d.parts))S.parts=d.parts.filter(id=>PARTS[id]).slice(0,PSLOTS);if(Array.isArray(d.fx))S.fx=d.fx.map(x=>FXD[x]?x:'');if(Array.isArray(d.charms))S.charms=d.charms.filter(c=>c&&CH[c.id]).map(c=>({id:c.id,v:+c.v||0}));if(Array.isArray(d.lineup))S.lineup=d.lineup.filter(k=>k==='c'||k==='d');
+const KEY_=KEY;try{const d=JSON.parse(localStorage.getItem(KEY_)||'null');if(d){for(const k in FRESH)if(typeof d[k]==='number')S[k]=d[k];if(Array.isArray(d.sides))S.sides=d.sides.map(Number).filter(v=>SIDES.includes(v));if(Array.isArray(d.pouch))S.pouch=d.pouch.filter(t=>COINS[t]&&t!=='plain');if(Array.isArray(d.parts))S.parts=d.parts.filter(id=>PARTS[id]).slice(0,PSLOTS);if(Array.isArray(d.fx))S.fx=d.fx.map(x=>FXD[x]?x:'');if(Array.isArray(d.charms))S.charms=d.charms.map(c=>c&&c.id==='ladder'?{...c,id:'pair'}:c).filter(c=>c&&CH[c.id]).map(c=>({id:c.id,v:+c.v||0}));if(Array.isArray(d.lineup))S.lineup=d.lineup.filter(k=>k==='c'||k==='d');
   // older saves had shared die upgrades: every die owned then keeps them
   S.dp=Array.isArray(d.dp)?d.dp.map(o=>({boom:+o.boom||0,reb:+o.reb?1:0,min:Math.max(1,+o.min||1),six:+o.six||0})):(d.sides||[]).map(()=>({boom:+d.boom||0,reb:+d.rebate?1:0,min:Math.max(1,+d.minFace||1),six:+d.sixes||0}));score.value=score.shown=+d.score||0}}catch(e){}
 S.sides=S.sides.slice(0,S.dice);while(S.sides.length<S.dice)S.sides.push(6);
@@ -799,7 +799,8 @@ function trigOne(nx,v){const q=CH[nx.id],th_=nx.id==='thermo';
 // roll-reading charms look past other charms to the nearest die on their left
 const dieLeftOf=i=>{for(let k=i-1;k>=0;k--)if(!line[k].charm)return line[k];return null};
 // dice to the left of lineup slot i that rose left to right, counted back from the nearest one
-function riseRun(i){const f=line.slice(0,i).filter(o=>!o.charm&&o.landed).map(o=>o.face);if(!f.length)return 0;let n=1;for(let k=f.length-2;k>=0&&f[k]<f[k+1];k--)n++;return n}
+// any two landed dice showing the same face
+const hasPair=()=>{const f=dice.filter(d=>d.landed).map(d=>d.face);return new Set(f).size<f.length};
 const headsNow=()=>coins.filter(o=>o.final&&o.res==='h').length,tailsNow=()=>coins.filter(o=>o.final&&o.res!=='h').length;
 // what a charm would do right now: {add} or {mult} with a label, or {miss} with a reason. Copycat and Bell borrow a neighbour's effect
 function evalCharm(c,depth=0){const i=line.indexOf(c),L=line[i-1],Rt=line[i+1],q=CH[c.id],V=S.val,h=headsNow(),t=tailsNow();
@@ -811,7 +812,7 @@ function evalCharm(c,depth=0){const i=line.indexOf(c),L=line[i-1],Rt=line[i+1],q
     case'even':return h?add(h*V*2):{miss:'no heads'};
     case'high':return mul(2);
     case'under':return mul(3);
-    case'ladder':{const n=riseRun(i);return n>=2?add(n*V*5,' RISE'):{miss:'not rising'}}
+    case'pair':return hasPair()?mul(2):{miss:'no pair'};
     case'clover':return h>=4?mul(1.5):{miss:h+' heads'};
     case'horse':return ph.paidKeys&&ph.paidKeys.size?mul(2):{miss:'no line'};
     case'anchor':return i===line.length-1?mul(3):{miss:'not last'};
@@ -822,7 +823,7 @@ function evalCharm(c,depth=0){const i=line.indexOf(c),L=line[i-1],Rt=line[i+1],q
 // badge state while you look at the lineup
 function charmLit(c){const i=line.indexOf(c),L=line[i-1],Rt=line[i+1],q=CH[c.id];
   if(q.roll||c.id==='thermo'){const D=dieLeftOf(i);return!!(D&&D.landed&&(c.id==='thermo'?D.face>=5:q.roll(D.face)))}
-  return{ladder:()=>riseRun(i)>=2,clover:()=>busy&&headsNow()>=4,horse:()=>busy&&!!(ph.paidKeys&&ph.paidKeys.size),anchor:()=>i===line.length-1,copy:()=>!!(Rt&&Rt.charm),bell:()=>!!(L&&L.charm)}[c.id]?.()??false}
+  return{pair:hasPair,clover:()=>busy&&headsNow()>=4,horse:()=>busy&&!!(ph.paidKeys&&ph.paidKeys.size),anchor:()=>i===line.length-1,copy:()=>!!(Rt&&Rt.charm),bell:()=>!!(L&&L.charm)}[c.id]?.()??false}
 function fireCharm(c,k){const r=evalCharm(c);c.hl=1;
   if(r.miss){c.j.shove(200).wobble(.2);sfx.tails();if(J)world.popText(r.miss,c.hx,c.hy+c.size*1.3,{size:Math.max(14,c.size*.3),ci:6,life:.8});return}
   if(r.via){r.via.hl=1;r.via.j.punch(10)}
@@ -1600,7 +1601,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127063647';let updShown=false,updDismissed='';
+const BUILD='20261127064832';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
