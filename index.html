@@ -74,7 +74,7 @@ button{font:inherit;color:var(--ink)}
 #goCount{position:absolute;left:calc(50% + var(--tw)*.75);font:calc(var(--tw)*.42)/1 "Archivo Black",sans-serif;color:#f7f0e1;text-shadow:0 2px 0 var(--line);white-space:nowrap}
 .tok.lift{visibility:hidden}
 /* first-run callout: a ghost token rides up from the cup into the slot */
-#goHint{position:absolute;inset:0;pointer-events:none;display:none}#go.hint #goHint{display:block}
+#goHint{position:absolute;inset:0;pointer-events:none;display:none}#go.hint #goHint,#go.idle #goHint{display:block}#go.idle #goHint b{animation:slam .45s cubic-bezier(.2,1.7,.4,1)}
 #goHint i{position:absolute;left:calc(50% - var(--tw)/2);bottom:calc(var(--tw)*1.95);width:var(--tw);height:calc(var(--tw)*.4);border-radius:50%;border:3px dashed #f7f0e1;opacity:0;animation:hintUp 1.6s cubic-bezier(.4,0,.3,1) infinite}
 #goHint b{position:absolute;left:calc(var(--u)*18px);bottom:calc(var(--tw)*1.25);padding:6px 9px;border:3px solid var(--line);border-radius:8px;background:var(--tag,#00b7f0);color:#0a0812;font:calc(var(--u)*12px)/1 "Archivo Black",sans-serif;white-space:nowrap;box-shadow:0 3px 0 var(--line);rotate:-6deg}
 @keyframes hintUp{0%{translate:0 0;opacity:0}15%{opacity:.9}70%{translate:0 calc(var(--hy,200px)*-1);opacity:.9;scale:.8}100%{translate:0 calc(var(--hy,200px)*-1);opacity:0;scale:.7}}
@@ -592,7 +592,7 @@ function renderStack(){const box=$('#goStack'),c=calibrating(),n=c?2:S.left,key=
   stackShown=c?-1:n}
 // the front covers the board: everything in the tray below the lineup
 const goWrap=$('#goWrap');
-function placeGo(){const bz=9,x=trayX+bz+5,y=coinTop-12,w=trayW-bz*2-10,h=Math.max(120,playBot-bz-5-y);
+function placeGo(){const bz=9,x=trayX+bz+5,y=Math.max(coinTop-12,line.length?Math.round(Math.max(...line.map(o=>o.hy+o.size*(!o.charm&&o.sides!==6?1.42:1.12)))+4):0),w=trayW-bz*2-10,h=Math.max(120,playBot-bz-5-y);
   Object.assign(goWrap.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
   const u=Math.max(.55,Math.min(1.2,h/600,w/330));go.style.setProperty('--u',u.toFixed(3));
   // how far the hint's ghost token rises: from the cup up to the slot
@@ -642,6 +642,7 @@ function swipeEnd(e,cancel){if(!sw||e.pointerId!==sw.id)return;const s_=sw;sw=nu
 const HINTK='oddsEngine.swipeHint',touchy=matchMedia('(pointer:coarse)').matches;
 let hintN=(()=>{try{return JSON.parse(localStorage.getItem(HINTK)||'{"s":0,"t":0}')}catch(e){return{s:0,t:0}}})();
 const hintOn=()=>touchy&&hintN.s<3&&hintN.t<5;
+const IDLE_HINT=7;let idleT=0;
 function noteHint(k){if(!hintOn())return;hintN[k[0]]++;try{localStorage.setItem(HINTK,JSON.stringify(hintN))}catch(e){}go.classList.toggle('hint',hintOn())}
 function makeCoin(x,y,s,hidden){const j=world.add(new Juicy(x,y,{from:0,k:430,z:.55}));if(hidden)j.s.t=0;else j.pop();
   return{id:++coinId,j,r:s.r,tx:s.x,ty:s.y,face:null,res:null,gold:false,flipping:false,t0:0,dur:FLIP,dim:0,hl:0,hidden}}
@@ -1586,6 +1587,7 @@ function frame(now){
   if(lvDelay>=0){lvDelay-=raw;if(lvDelay<0)openLevel()}
   if(goHold>0)goHold-=raw;
   refreshGo();
+  if(!goHidden&&!inserting&&!sw&&!isPaused()){idleT+=raw;if(idleT>IDLE_HINT&&!go.classList.contains('idle'))go.classList.add('idle')}else{idleT=0;go.classList.remove('idle')}
   draw();
   const ci=cycleIndex(),pk=J?ci:-1;if(pk!==lastPal){lastPal=pk;const rs=document.documentElement.style;rs.setProperty('--pal',J?pal(ci):'#ffd400');rs.setProperty('--pal2',J?pal(ci+3):'#00b7f0')}
   requestAnimationFrame(frame);
@@ -1707,7 +1709,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127173654';let updShown=false,updDismissed='';
+const BUILD='20261127174538';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1726,11 +1728,12 @@ go.addEventListener('animationend',e=>{if(e.animationName==='hit'||e.animationNa
 $('#pouchBtn').addEventListener('animationend',e=>{if(e.animationName==='hit')e.currentTarget.classList.remove('bump')});
 cardsEl.addEventListener('animationend',e=>{const c=e.target.closest('.card');if(c&&e.animationName==='flipIn'){c.style.setProperty('--fd',(-Math.random()*3).toFixed(2)+'s');c.classList.add('idle')}});
 function syncAmb(){document.documentElement.classList.toggle('amb',amb())}syncAmb();
-go.addEventListener('pointerdown',e=>{e.preventDefault();
+go.addEventListener('pointerdown',e=>{e.preventDefault();idleT=0;go.classList.remove('idle');
   if(e.target.closest('#goStack')&&swipeStart(e)){try{go.setPointerCapture(e.pointerId)}catch(_){}}else tryPlay()});
 go.addEventListener('pointermove',swipeMove);
 go.addEventListener('pointerup',e=>swipeEnd(e,false));go.addEventListener('pointercancel',e=>swipeEnd(e,true));
 go.classList.toggle('hint',hintOn());
+$('#goHint b').textContent=touchy?'SWIPE OR TAP ↑':'CLICK OR DRAG ↑';
 const release=()=>{go.classList.remove('down')};
 ['pointerup','pointerleave','pointercancel'].forEach(ev=>go.addEventListener(ev,release));
 addEventListener('keydown',e=>{
