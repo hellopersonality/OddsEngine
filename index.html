@@ -33,9 +33,11 @@ button{font:inherit;color:var(--ink)}
 #go:active,#go.down,.sw:active,#again:active,.card:active,.tog:active,#pouchBtn:active,#reroll:active,#skipUp:active,#swapBack:active{transform:translateY(var(--dp));box-shadow:0 4px 0 -4px var(--rim),0 4px 0 0 var(--line)}
 .bright{border-color:var(--line);color:#0d0a18}
 #ui{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;padding:8px max(14px,env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom))}
-#probe{position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+/* --top: the notch/status-bar inset plus a little extra on phones, where iOS blurs a band just below the status bar */
+:root{--top:env(safe-area-inset-top)}@media (pointer:coarse){:root{--top:calc(env(safe-area-inset-top) + 18px)}}
+#probe{position:fixed;visibility:hidden;pointer-events:none;padding:var(--top) 0 env(safe-area-inset-bottom)}
 @media(max-width:420px){#pouchBtn,.tog{min-height:34px;padding:5px 10px;font-size:12px}}
-#upd{position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top));z-index:8;display:none;align-items:center;gap:10px;padding:8px 8px 8px 14px;translate:-50% 0;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:5px 5px 0 var(--accent);animation:slam .4s cubic-bezier(.2,1.7,.4,1)}
+#upd{position:fixed;left:50%;top:calc(58px + var(--top));z-index:8;display:none;align-items:center;gap:10px;padding:8px 8px 8px 14px;translate:-50% 0;font-weight:700;font-size:14px;white-space:nowrap;box-shadow:5px 5px 0 var(--accent);animation:slam .4s cubic-bezier(.2,1.7,.4,1)}
 #upd.open{display:flex}#upd button{--dp:3px;min-height:36px;padding:4px 12px;font-weight:700;cursor:pointer}
 #updGo{background:var(--yellow)}
 #go{--dp:9px;border-radius:22px;width:100%;height:clamp(60px,10svh,80px);font:clamp(28px,8.6vw,38px)/1 "Archivo Black",Impact,sans-serif;letter-spacing:.02em;background:var(--yellow);cursor:pointer;transition:translate .32s cubic-bezier(.3,1.5,.5,1),opacity .18s,transform .05s,box-shadow .05s}
@@ -74,7 +76,7 @@ button{font:inherit;color:var(--ink)}
 @keyframes ready{40%{scale:1.05 1.1}}
 @keyframes hit{35%{scale:1.03 .92}70%{scale:.99 1.04}}
 :focus-visible{outline:3px dashed var(--ink);outline-offset:4px}
-#pouchBtn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:max(calc(12px + var(--hudIn,0px)),env(safe-area-inset-left));z-index:3;min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
+#pouchBtn{position:fixed;top:calc(10px + var(--top));left:max(calc(12px + var(--hudIn,0px)),env(safe-area-inset-left));z-index:3;min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
 #pouchBtn.bump{animation:hit .3s}
 #pouchDlg,#dieDlg,#instDlg{position:fixed;inset:0;z-index:6;display:none;place-items:center;padding:14px;background:rgba(10,10,12,.8)}#pouchDlg.open,#dieDlg.open,#instDlg.open{display:grid}#instDlg{z-index:8}
 #pouchBox,#dieBox,#instBox{width:100%;max-width:520px;max-height:90vh;overflow:auto;padding:18px;display:grid;gap:12px;--rim:var(--accent);--dp:8px}
@@ -98,7 +100,7 @@ button{font:inherit;color:var(--ink)}
 .faces{display:flex;flex-wrap:wrap;gap:8px}.face{min-width:34px;height:34px;padding:0 4px;box-sizing:border-box;display:grid;place-items:center;border:3px solid var(--line);border-radius:9px;background:var(--surf);color:var(--ink);font:14px/1 "Archivo Black",sans-serif;box-shadow:0 3px 0 var(--line)}
 .face.fx{color:#ffffff}.face.max{outline:3px solid #ff1100;outline-offset:2px}.face.dead{opacity:.3}.face.cur{transform:translateY(-4px);box-shadow:0 7px 0 var(--line)}
 .gb{width:40px;height:40px;border-radius:50%;border:3px solid #0d0a18;box-sizing:border-box;display:grid;place-items:center;font:15px/1 "Archivo Black",sans-serif;color:#0d0a18;box-shadow:0 3px 0 #0d0a18}
-#opt{position:fixed;top:calc(10px + env(safe-area-inset-top));right:max(calc(12px + var(--hudIn,0px)),env(safe-area-inset-right));display:grid;justify-items:end;gap:8px;z-index:3}
+#opt{position:fixed;top:calc(10px + var(--top));right:max(calc(12px + var(--hudIn,0px)),env(safe-area-inset-right));display:grid;justify-items:end;gap:8px;z-index:3}
 .tog{min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
 .tog[aria-pressed=false]{opacity:.55}
 #panel{display:none;gap:8px;justify-items:end}#panel.open{display:grid}
@@ -1519,7 +1521,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127060326';let updShown=false,updDismissed='';
+const BUILD='20261127061153';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
