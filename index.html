@@ -1038,16 +1038,34 @@ function showSwap(p){
   line.forEach((d,i)=>{const b=document.createElement('button');b.className='sw slab';const c=document.createElement('canvas');if(d.charm)charmIcon(c,d.id,56);else dieIcon(c,d.sides,56,d.fx);
     const l=document.createElement('span');l.textContent=d.charm?CH[d.id].name:d.fx?FXD[d.fx].name:'d'+d.sides;b.append(c,l);
     if(p.charm&&!d.charm&&dice.length<=1){b.disabled=true;b.style.opacity=.4;l.textContent+=' (last die)'}
-    b.addEventListener('click',()=>pick(p,i));row.appendChild(b)});
+    b.addEventListener('click',()=>{sfx.press();confirmSwap(p,i)});row.appendChild(b)});
   sfx.press();setTimeout(()=>{const f=row.querySelector('.sw');if(f)f.focus({preventScroll:true})},30);
 }
 function showPartSwap(p){
   cardsEl.hidden=true;rerollBtn.hidden=true;$('#skipUp').hidden=true;$('#swap').hidden=false;$('.sub').textContent=`Parts full: swap ${p.name} in for which part?`;
   const row=$('#swapRow');row.innerHTML='';
   S.parts.forEach((id,i)=>{const b=document.createElement('button');b.className='sw slab';const c=document.createElement('canvas');partIcon(c,id,56);
-    const l=document.createElement('span');l.textContent=PARTS[id].name;b.append(c,l);b.addEventListener('click',()=>pick(p,i));row.appendChild(b)});
+    const l=document.createElement('span');l.textContent=PARTS[id].name;b.append(c,l);b.addEventListener('click',()=>{sfx.press();confirmSwap(p,i,true)});row.appendChild(b)});
   sfx.press();setTimeout(()=>{const f=row.querySelector('.sw');if(f)f.focus({preventScroll:true})},30);
 }
+// tapping something to swap out: its card opens first (what you'd lose), then what replaces it, then Replace / Keep it
+function confirmSwap(p,i,isPart){
+  const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+  if(isPart){const id=S.parts[i],B=$('#dieBody');B.innerHTML='';partIcon($('#dieIco'),id,64);$('#dieTitle').textContent=PARTS[id].name;$('#dieSub').textContent=`Machine part · ${i+1} of ${PSLOTS}`;
+    B.appendChild(el('h3','ptitle','WHAT IT DOES'));B.appendChild(el('p','note',PARTS[id].desc));dieDlg.classList.add('open')}
+  else{const o=line[i];if(o.charm)openCharm(o);else openDie(dice.indexOf(o))}
+  const B=$('#dieBody'),old=isPart?PARTS[S.parts[i]].name:line[i].charm?CH[line[i].id].name:line[i].fx?FXD[line[i].fx].name:'d'+line[i].sides;
+  // the old card's own help text about charms is noise here
+  [...B.querySelectorAll('.ptitle')].forEach(h=>{if(h.textContent==='HOW CHARMS WORK'){const n=h.nextElementSibling;h.remove();if(n)n.remove()}});
+  B.appendChild(el('h3','ptitle','REPLACE IT WITH'));
+  const r=el('div','prow slab'),tx=el('div'),ic=document.createElement('canvas');iconFor(p.id,ic);ic.style.width=ic.style.height='44px';tx.append(el('b',null,p.name),el('small',null,p.desc()));r.append(ic,tx,el('span'));B.appendChild(r);
+  if(!isPart&&!line[i].charm&&line[i].p&&(line[i].p.boom||line[i].p.reb||line[i].p.min>1||line[i].p.six))B.appendChild(el('p','note','Its die upgrades are lost with it.'));
+  if(!isPart&&line[i].charm&&line[i].id==='thermo'&&(line[i].v||0)>0)B.appendChild(el('p','note',`Its built-up heat (×${thermoM(line[i])}) is lost with it.`));
+  const row=el('div');row.style.cssText='display:flex;gap:10px;justify-content:center;margin-top:6px';
+  const yes=el('button','slab bright',`Replace ${old}`),no=el('button','tog slab','Keep it');
+  yes.style.cssText='--dp:5px;min-height:46px;padding:8px 16px;background:var(--yellow);font:16px/1 "Archivo Black",sans-serif;cursor:pointer';no.style.cssText='min-height:46px;padding:8px 16px;font-size:15px';
+  yes.addEventListener('click',()=>{closeDie();pick(p,i)});no.addEventListener('click',()=>{closeDie();sfx.press()});
+  row.append(no,yes);B.appendChild(row);requestAnimationFrame(fitAll);setTimeout(()=>yes.focus(),40)}
 // skipping is a pick that applies nothing: the level still advances, score carries over and presses refill
 const SKIP={id:'skip',name:'Skipped'};
 $('#skipUp').addEventListener('click',()=>pick(SKIP));
@@ -1601,7 +1619,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127064832';let updShown=false,updDismissed='';
+const BUILD='20261127065552';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
