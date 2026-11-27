@@ -527,7 +527,6 @@ function coinSlots(n){
   const{cols,rows,cell}=best,r=Math.min((n===1?64:46)*UI.k,cell*.38),out=[];
   for(let i=0;i<n;i++){const row=Math.floor(i/cols),rc=row===rows-1?n-row*cols:cols,col=i%cols+Math.floor((cols-rc)/2);
     out.push({x:W/2+(col-(cols-1)/2)*cell,y:top+h/2+(row-(rows-1)/2)*cell,r,row,col,cell})}
-  if(n===1&&!dice.length){out[0].y=top+h*.74;out[0].r=Math.min(out[0].r,h*.15)}
   out.cols=cols;out.rows=rows;return out;
 }
 function layout(first){
@@ -562,9 +561,9 @@ function renderStack(){const box=$('#goStack'),c=calibrating(),n=c?2:S.left,key=
     if(prev>=0&&i>=prev&&!c){t.classList.add('in');t.style.animationDelay=(n-prev>1?.25+(i-prev)*.09:0)+'s'}box.appendChild(t)}
   const lbl=document.createElement('span');lbl.id='goCount';lbl.textContent=c?'∞':'×'+n;lbl.style.bottom=`calc(var(--tw)*${(Math.max(1,n)*step+.42).toFixed(2)})`;box.appendChild(lbl);
   stackShown=c?-1:n}
-// where the box sits: the middle of the board; on level 1 it sits higher, over the single coin it drops its token onto
-function placeGo(){const top=coinTop,h=Math.max(80,playBot-24-top),bw=Math.round(Math.max(104,Math.min(168,h*(dice.length?.36:.3),trayW*.4)));
-  go.style.setProperty('--bw',bw+'px');go.style.left=(W/2+bw*.23)+'px';go.style.top=(dice.length?top+h/2:top+h*.3)+'px'}
+// where the box sits: the middle of the board (the board is empty whenever the box is showing)
+function placeGo(){const top=coinTop,h=Math.max(80,playBot-24-top),bw=Math.round(Math.max(104,Math.min(168,h*.36,trayW*.4)));
+  go.style.setProperty('--bw',bw+'px');go.style.left=(W/2+bw*.23)+'px';go.style.top=(top+h/2)+'px'}
 // a token flying across the screen (as a fixed DOM element so it can cross the canvas and the box)
 function flyTok(x0,y0,x1,y1,cls,dur,done,arc=60){const t=document.createElement('span');t.className='tok tokFly '+(cls||'');const tw=parseFloat(getComputedStyle(go).getPropertyValue('--bw'))*.36;
   t.style.cssText=`--tw:${tw}px;left:${x0-tw/2}px;top:${y0-tw*.2}px`;document.body.appendChild(t);
@@ -582,9 +581,7 @@ function tryPlay(){if(!canPress())return;audio();inserting=true;go.classList.add
   const r=top.getBoundingClientRect();top.style.visibility='hidden';
   flyTok(r.left+r.width/2,r.top+r.height/2,sx,sy,top.classList.contains('free')?'free':top.classList.contains('lastT')?'lastT':'',230,()=>{
     sfx.press();go.classList.remove('hit');void go.offsetWidth;go.classList.add('hit');
-    // level 1: the token falls out the bottom of the box and lands as the coin
-    if(!dice.length&&coins[0]){const b=$('#goBox').getBoundingClientRect(),c=coins[0];flyTok(b.left+b.width/2,b.bottom,c.tx,c.ty,'',200,()=>{c.j.punch(10);go_()},0)}
-    else setTimeout(go_,60)},50)}
+    setTimeout(go_,60)},50)}
 function makeCoin(x,y,s,hidden){const j=world.add(new Juicy(x,y,{from:0,k:430,z:.55}));if(hidden)j.s.t=0;else j.pop();
   return{id:++coinId,j,r:s.r,tx:s.x,ty:s.y,face:null,res:null,gold:false,flipping:false,t0:0,dur:FLIP,dim:0,hl:0,hidden}}
 function spawnCoin(c){c.hidden=false;c.j.s.t=1;c.j.s.v+=8;c.j.moveTo(c.tx,c.ty);c.j.wobble(.45)}
@@ -598,8 +595,7 @@ const nbrs=c=>coins.filter(o=>o!==c&&Math.hypot(o.tx-c.tx,o.ty-c.ty)<(c.cell||99
 // clear the tray back to its idle state as soon as a press has played out
 function resetTray(){
   ph.paid=[];ph.miss=[];ph.lines=[];tease=null;
-  if(dice.length)clearCoins();
-  else coins.forEach(c=>{c.face=null;c.dim=0;c.hl=0;c.j.punch(5)});
+  clearCoins();
   dice.forEach(d=>{d.hl=0;d.armed=false});
 }
 let updPending=false;
@@ -616,7 +612,7 @@ function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setIt
   if(short<=Math.max(2,need()*.2))addLine(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)addLine(`Your machine: ${line.map(o=>o.charm?CH[o.id].name:o.fx?FXD[o.fx].name:'d'+o.sides).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
 function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];S.dp=[];S.charms=[];S.lineup=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
-  clearLine();clearCoins();events=[];busy=false;save();layout();const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)];sfx.buy()}
+  clearLine();clearCoins();events=[];busy=false;save();layout();sfx.buy()}
 function refreshGo(){const h=menuOpen||busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
   if(!h){go.classList.remove('ready');void go.offsetWidth;go.classList.add('ready');sfx.ready()}else go.classList.remove('down')}
 function press(){
@@ -1649,7 +1645,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127162934';let updShown=false,updDismissed='';
+const BUILD='20261127163210';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1697,11 +1693,9 @@ let resetArm=-1e9;
 $('#tReset').addEventListener('click',e=>{const b=e.currentTarget;if(performance.now()-resetArm>2500){resetArm=performance.now();b.textContent='Tap again to reset';return}
   b.textContent='Reset save';resetArm=0;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];S.dp=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   lvlOpen=false;lvDelay=-1;lvlEl.classList.remove('open');over=false;overDelay=-1;$('#over').classList.remove('open');
-  S.charms=[];S.lineup=[];clearLine();clearCoins();events=[];setBusy(false);save();layout();
-  const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)]});
+  S.charms=[];S.lineup=[];clearLine();clearCoins();events=[];setBusy(false);save();layout()});
 addEventListener('resize',()=>layout());
 layout(true);
-if(!coins.length&&!dice.length){const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)]}
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>layout());
 requestAnimationFrame(frame);
 }
