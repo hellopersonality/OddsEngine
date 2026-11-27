@@ -58,6 +58,13 @@ button{font:inherit;color:var(--ink)}
 #goSlit{position:relative;margin-top:calc(var(--u)*14px);width:calc(var(--u)*92px);height:calc(var(--u)*112px);border:5px solid var(--line);border-radius:16px;background:#f7f0e1;box-shadow:inset 0 -6px 0 #d9d0bd;display:grid;place-items:center;flex:none}
 #goSlit::before{content:'';width:22%;height:66%;border-radius:8px;background:#0a0812}
 #go.down #goSlit{translate:0 3px}#go.hit #goSlit{animation:hit .2s}
+/* swipe juice: the slot glows and swells as the token nears it (--sp: 0..1), flashes when the token lands */
+#goSlit{scale:calc(1 + var(--sp,0)*.1);box-shadow:inset 0 -6px 0 #d9d0bd,0 0 calc(var(--sp,0)*34px) calc(var(--sp,0)*8px) var(--stripe,#ff0d7e);transition:scale .08s,box-shadow .08s}
+#goSlit.flash{animation:slotFlash .38s cubic-bezier(.2,1.6,.4,1)}
+@keyframes slotFlash{0%{background:#fff;scale:1.35;box-shadow:inset 0 -6px 0 #d9d0bd,0 0 60px 18px #fff}100%{scale:1}}
+#goArrow i.on{opacity:1!important;filter:drop-shadow(1px 1px 0 var(--cabHi,#aea3f8)) drop-shadow(0 0 8px var(--stripe,#ff0d7e));animation:none!important}
+.tokGhost{position:fixed;z-index:8;pointer-events:none;opacity:.45}
+.spark{position:fixed;z-index:9;pointer-events:none;border:2px solid var(--line);border-radius:3px}
 #goLbl{margin-top:calc(var(--u)*12px);font:calc(var(--u)*54px)/1 "Archivo Black",Impact,sans-serif;letter-spacing:.02em;color:#f7f0e1;text-shadow:0 4px 0 var(--line)}
 #goLeft{margin-top:calc(var(--u)*10px);padding:4px 10px;border-radius:7px;background:#0a0812;color:var(--yellow);font:700 calc(var(--u)*14px)/1.2 "Space Grotesk",sans-serif;white-space:nowrap}
 #go.last #goLeft{background:#ff1100;color:#fff}
@@ -613,7 +620,18 @@ const tokCls=t=>t.classList.contains('free')?'free':t.classList.contains('lastT'
 const topTok=()=>{const a=$('#goStack').querySelectorAll('.tok');return a[a.length-1]};
 const slitPt=()=>{const r=$('#goSlit').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height*.35}};
 // the token is in: punch the box (harder for a harder flick), then the machine runs
-function tokIn(power=1){sfx.press();go.classList.remove('hit');void go.offsetWidth;go.classList.add('hit');if(J&&power>1.3)world.shake(Math.min(.35,.12*power));
+// a burst of sparks and little coins out of the slot
+function slotBurst(x,y,power){const n=Math.round(8+power*6),cols=['#ffd400','#ffc300','#f7f0e1',getComputedStyle(document.documentElement).getPropertyValue('--stripe')||'#ff0d7e'];
+  for(let i=0;i<n;i++){const e=document.createElement('span'),coinish=i%3===0,sz=coinish?10+Math.random()*6:5+Math.random()*5;e.className='spark';
+    e.style.cssText=`left:${x-sz/2}px;top:${y-sz/2}px;width:${sz}px;height:${coinish?sz*.55:sz}px;background:${cols[i%cols.length]};border-radius:${coinish?'50%':'3px'}`;document.body.appendChild(e);
+    const a=-Math.PI/2+(Math.random()-.5)*2.6,d=(50+Math.random()*90)*(.7+power*.35),dx=Math.cos(a)*d,dy=Math.sin(a)*d;
+    const an=e.animate([{transform:'translate(0,0) rotate(0) scale(1)',opacity:1},{transform:`translate(${dx}px,${dy}px) rotate(${(Math.random()-.5)*540}deg) scale(.9)`,opacity:1,offset:.55},{transform:`translate(${dx*1.2}px,${dy+80}px) rotate(${(Math.random()-.5)*720}deg) scale(.4)`,opacity:0}],{duration:520+Math.random()*260,easing:'cubic-bezier(.2,.7,.4,1)'});an.onfinish=()=>e.remove()}}
+const buzz=p=>{try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+function tokIn(power=1){sfx.press();go.classList.remove('hit');void go.offsetWidth;go.classList.add('hit');
+  // the clunk: a low thud, a rattle down the chute and a bright chime that rises with how hard it went in
+  tone(170,.1,'square',.09,55);noise(.07,.16,900);setTimeout(()=>tone(700+power*160,.12,'triangle',.05,1400+power*200),40);buzz(power>1.6?[14,40,22]:14);
+  if(J){const sl=$('#goSlit');sl.classList.remove('flash');void sl.offsetWidth;sl.classList.add('flash');const sp=slitPt();slotBurst(sp.x,sp.y,power);bgKick(sp.x,sp.y,.35+.25*power,0,power>1.8);
+    world.shake(Math.min(.4,.06+.1*power));if(power>1.9)world.popText('NICE FLICK!',W/2,coinTop+40,{size:Math.min(30,W/13),layers:2,kick:6,life:.8,ci:3})}
   setTimeout(()=>{inserting=false;if(calibrating())stackKey='';press()},60)}
 function tryPlay(){if(!canPress())return;audio();inserting=true;go.classList.add('down');noteHint('tap');
   const top=topTok(),sp=slitPt();
@@ -625,19 +643,26 @@ let sw=null;
 function swipeStart(e){if(!canPress())return false;const top=topTok();if(!top||!J)return false;audio();
   const r=top.getBoundingClientRect(),f=document.createElement('span');f.className='tok tokFly '+tokCls(top);const tw=r.width;
   f.style.cssText=`--tw:${tw}px;left:${r.left}px;top:${r.top}px`;
-  sw={id:e.pointerId,x0:e.clientX,y0:e.clientY,top,f,cx:r.left+r.width/2,cy:r.top+r.height/2,dx:0,dy:0,moved:false,pts:[{y:e.clientY,t:e.timeStamp}]};return true}
+  const sp=slitPt();sw={id:e.pointerId,x0:e.clientX,y0:e.clientY,top,f,cx:r.left+r.width/2,cy:r.top+r.height/2,dx:0,dy:0,moved:false,pts:[{y:e.clientY,t:e.timeStamp}],dist:Math.max(40,r.top+r.height/2-sp.y),sx:sp.x,step:0,lt:0};return true}
+const setSp=p=>{go.style.setProperty('--sp',p.toFixed(3));go.querySelectorAll('#goArrow i').forEach((c,i)=>c.classList.toggle('on',p>(i+1)/4))};
 function swipeMove(e){if(!sw||e.pointerId!==sw.id)return;sw.dx=e.clientX-sw.x0;sw.dy=e.clientY-sw.y0;sw.pts.push({y:e.clientY,t:e.timeStamp});if(sw.pts.length>6)sw.pts.shift();
   if(!sw.moved&&Math.hypot(sw.dx,sw.dy)>8){sw.moved=true;inserting=true;sw.top.classList.add('lift');document.body.appendChild(sw.f)}
-  if(sw.moved){const up=Math.min(0,sw.dy),dn=Math.max(0,sw.dy)*.25;sw.f.style.transform=`translate(${sw.dx*.6}px,${up+dn}px) rotate(${sw.dx*.15}deg) scale(${1+Math.min(.25,-up/400)})`}}
+  if(sw.moved){const up=Math.min(0,sw.dy),dn=Math.max(0,sw.dy)*.25,p=Math.max(0,Math.min(1,-up/sw.dist));
+    // near the slot the token is pulled in: it slides toward the slot's centre and turns edge-on
+    const m=Math.max(0,(p-.6)/.4),ex=sw.dx*.6*(1-m)+(sw.sx-sw.cx)*m*.9;
+    sw.f.style.transform=`translate(${ex}px,${up+dn}px) rotate(${sw.dx*.15*(1-m)+m*55}deg) scale(${1+p*.3},${1+p*.3-m*.35})`;
+    if(J){setSp(p);const now=e.timeStamp;if(now-sw.lt>34&&p>.05){sw.lt=now;const g=sw.f.cloneNode();g.classList.add('tokGhost');g.style.transform=sw.f.style.transform;document.body.appendChild(g);const an=g.animate([{opacity:.4},{opacity:0,transform:sw.f.style.transform+' scale(.85)'}],{duration:240});an.onfinish=()=>g.remove()}}
+    // a ratchet: each step closer to the slot clicks, a little higher each time
+    const st=Math.floor(p*6);if(st>sw.step){for(let k=sw.step+1;k<=st;k++)tone(420+k*130,.03,'square',.03);buzz(4)}sw.step=Math.max(sw.step,st)}}
 function swipeEnd(e,cancel){if(!sw||e.pointerId!==sw.id)return;const s_=sw;sw=null;
   if(!s_.moved){if(!cancel)tryPlay();return}
   const a=s_.pts[0],b=s_.pts[s_.pts.length-1],v=(a.y-b.y)/Math.max(1,b.t-a.t),sp=slitPt(),dist=s_.cy-sp.y,
     cur=s_.f.style.transform,launch=!cancel&&(v>.45||-s_.dy>dist*.55);
   if(launch){noteHint('swipe');const tx=sp.x-s_.cx,ty=sp.y-s_.cy,dur=Math.max(90,Math.min(220,(dist+s_.dy)/Math.max(.6,v)));
     const an=s_.f.animate([{transform:cur},{transform:`translate(${tx}px,${ty}px) rotate(70deg) scale(.7)`}],{duration:dur,easing:'cubic-bezier(.2,.7,.4,1)',fill:'forwards'});
-    an.onfinish=()=>{s_.f.remove();tokIn(1+Math.max(0,v-.45)*1.6)}}
+    an.onfinish=()=>{s_.f.remove();setSp(0);tokIn(1+Math.max(0,v-.45)*1.6)}}
   else{const an=s_.f.animate([{transform:cur},{transform:'translate(0,0)'}],{duration:260,easing:'cubic-bezier(.3,1.6,.5,1)',fill:'forwards'});
-    an.onfinish=()=>{s_.f.remove();s_.top.classList.remove('lift');inserting=false}}}
+    setSp(0);an.onfinish=()=>{s_.f.remove();s_.top.classList.remove('lift');inserting=false;tone(1100,.04,'triangle',.04);setTimeout(()=>tone(1500,.03,'triangle',.025),50)}}}
 // first-run callout on touch screens: shown until a few swipes (or taps) have happened, then never again
 const HINTK='oddsEngine.swipeHint',touchy=matchMedia('(pointer:coarse)').matches;
 let hintN=(()=>{try{return JSON.parse(localStorage.getItem(HINTK)||'{"s":0,"t":0}')}catch(e){return{s:0,t:0}}})();
@@ -1709,7 +1734,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127174538';let updShown=false,updDismissed='';
+const BUILD='20261127185420';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
