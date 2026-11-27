@@ -602,7 +602,7 @@ function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Ob
 function refreshGo(){const h=menuOpen||busy||lvlOpen||lvDelay>=0||over||overDelay>=0||(!calibrating()&&S.left<=0);if(h===goHidden)return;goHidden=h;go.classList.toggle('wait',h);
   if(!h){go.classList.remove('ready');void go.offsetWidth;go.classList.add('ready');sfx.ready()}else go.classList.remove('down')}
 function press(){
-  if(menuOpen||lvlOpen||lvDelay>=0||busy)return;
+  if(isPaused()||lvlOpen||lvDelay>=0||busy)return;
   audio();
   if(score.value>=need()||(!calibrating()&&S.left<=0))return;
   S.presses++;if(calibrating())S.calib++;else{S.left--;freePips.delete(S.left)}updateGoLabel();setBusy(true);save();ph={tot:0,heads:0,n:0,streak:0,left:0,reflips:0,refunds:0,lines:[],paid:[],miss:[],teased:0,fx:false,paidKeys:new Set()};events=[];T=0;reels=null;ph.dq=[];ph.mult=1;dice.forEach(d=>{d.armed=false;d.refunded=false;d.landed=false});charms.forEach(c=>{c.spark=0});
@@ -1441,12 +1441,18 @@ function draw(){
     ctx.save();ctx.translate(x+(Math.random()*2-1)*jt,y+(Math.random()*2-1)*jt);ctx.scale(k,k);ctx.translate(-x,-y);drawSticker(ctx,hudJ,score.text,sz,undefined,scoreLive,false);ctx.restore()}
   if(ph.sweep&&J)drawSticker(ctx,totJ,'+'+fmt(ph.tot),Math.min(58,W/7));
   world.drawPops(ctx);
+  if(optOpen()){ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='rgba(8,6,16,.55)';ctx.fillRect(0,0,W,H);ctx.font=`${Math.min(46,W/8)}px "Archivo Black", Impact, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
+    ctx.lineWidth=10;ctx.strokeStyle='#0d0a18';ctx.strokeText('PAUSED',W/2,(playTop+playBot)/2);ctx.fillStyle=th.ink||'#f7f0e1';ctx.fillText('PAUSED',W/2,(playTop+playBot)/2)}
 }
 
 // ================= loop =================
 let last=performance.now(),lastPal=null;
+// any sub-menu open (Options, Pouch, a die/charm/machine card, the main menu) freezes the game clock; closing it resumes
+const panelEl=$('#panel'),optOpen=()=>panelEl.classList.contains('open');
+const isPaused=()=>optOpen()||pouchDlg.classList.contains('open')||dieDlg.classList.contains('open')||menuOpen;
+function closeOpt(){panelEl.classList.remove('open');$('#optBtn').setAttribute('aria-expanded','false')}
 function frame(now){
-  const raw=Math.min(.05,(now-last)/1000);last=now;const dt=raw*cfg.timeScale;T+=dt;
+  const P=isPaused(),raw=P?0:Math.min(.05,(now-last)/1000);last=now;const dt=raw*cfg.timeScale;T+=dt;
   for(let guard=0;guard<8;guard++){const due=events.filter(e=>e.t<=T);if(!due.length)break;events=events.filter(e=>e.t>T);due.sort((a,b)=>a.t-b.t).forEach(e=>e.fn())}
   charms.forEach(c=>{c.hl=Math.max(0,c.hl-dt*1.8);c.spark=Math.max(0,c.spark-dt*1.6)});
   dice.forEach(d=>{if(d.rolling){const p=Math.min(1,(T-d.t0)/d.lt);d.spin=(d.spin||0)+dt*(1-p)*22;d.ft-=dt;if(d.ft<=0){d.ft=.04+p*p*.16;d.face=anyFace(d);sfx.tumble(p)}}else d.spin=0;d.hl=Math.max(0,d.hl-dt*1.8);if(d.bp)for(const k in d.bp)d.bp[k]=Math.max(0,d.bp[k]-dt*2.2)});
@@ -1594,7 +1600,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127063309';let updShown=false,updDismissed='';
+const BUILD='20261127063647';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1617,6 +1623,7 @@ go.addEventListener('pointerdown',e=>{e.preventDefault();go.classList.add('down'
 const release=()=>{go.classList.remove('down')};
 ['pointerup','pointerleave','pointercancel'].forEach(ev=>go.addEventListener(ev,release));
 addEventListener('keydown',e=>{
+  if(optOpen()&&(e.code==='Escape'||e.code==='Space'||e.code==='Enter')&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#panel'))){e.preventDefault();closeOpt();return}
   if(instDlg.classList.contains('open')){if(e.code==='Escape')closeInst();return}
   if(menuOpen)return;
   if(dieDlg.classList.contains('open')){if(e.code==='Escape')closeDie();return}
@@ -1629,6 +1636,8 @@ addEventListener('keyup',e=>{if(e.code==='Space'||e.code==='Enter')release()});
 addEventListener('blur',release);
 const tog=(el,on)=>el.setAttribute('aria-pressed',on?'true':'false');
 $('#optBtn').addEventListener('click',()=>{const p=$('#panel'),o=!p.classList.contains('open');p.classList.toggle('open',o);$('#optBtn').setAttribute('aria-expanded',o)});
+// while Options is open, a tap anywhere else just closes it (and resumes) instead of doing something
+addEventListener('pointerdown',e=>{if(optOpen()&&!e.target.closest('#opt')){e.stopPropagation();e.preventDefault();closeOpt()}},true);
 $('#tJuice').addEventListener('click',e=>{J=!J;setTimeout(syncAmb);cfg.shadow=cfg.cycle=cfg.punch=J;cfg.shake=J&&!matchMedia('(prefers-reduced-motion: reduce)').matches;tog(e.currentTarget,J)});
 $('#tSlow').addEventListener('click',e=>{cfg.timeScale=cfg.timeScale===1?.2:1;tog(e.currentTarget,cfg.timeScale!==1)});
 $('#tSound').addEventListener('click',e=>{sound=!sound;tog(e.currentTarget,sound)});
