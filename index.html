@@ -113,20 +113,26 @@ button{font:inherit;color:var(--ink)}
 .sub span{display:block}
 .fit{white-space:nowrap;overflow:hidden}
 #cards{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-.card{position:relative;display:grid;grid-template-rows:auto auto auto 1fr;justify-items:center;text-align:center;gap:8px;padding:0 12px 14px;overflow:hidden;cursor:pointer;opacity:0;animation:flipIn .38s cubic-bezier(.2,1.5,.4,1) forwards;transition:translate .06s,box-shadow .06s}
+.card{position:relative;isolation:isolate;display:grid;grid-template-rows:auto auto auto 1fr auto;justify-items:center;text-align:center;gap:7px;padding:var(--pt,14px) 14px 12px;overflow:visible;cursor:pointer;border:0;background:none;color:var(--ink);font:inherit;opacity:0;animation:flipIn .38s cubic-bezier(.2,1.5,.4,1) forwards;transition:translate .06s,box-shadow .06s}
 .card:hover{translate:0 -4px}
 @keyframes flipIn{from{opacity:0;transform:perspective(600px) rotateY(95deg) scale(.8)}to{opacity:1;transform:none}}
-.card{border-radius:20px}.card .band{width:calc(100% + 24px);padding:7px 5px;font:13px/1.2 "Archivo Black",sans-serif;letter-spacing:.06em;color:#0d0a18;border-bottom:4px solid var(--line)}
-.card.r0 .band{background:#00b7f0}.card.r1 .band{background:#9f5eff}.card.r2 .band{background:var(--pal)}
-.card.r2{--rim:#c9a400;outline:4px solid var(--pal);outline-offset:4px}
+/* upgrade cards: the silhouette (drawn as an SVG behind the content) and the band say the type; the gem says the rarity */
+.card .cshape{position:absolute;left:-12px;top:-12px;z-index:-1;pointer-events:none;overflow:visible}
+.card .band{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 8px;background:var(--tc);border:3px solid var(--line);border-radius:9px;font:12px/1 "Archivo Black",sans-serif;letter-spacing:.08em;color:#0d0a18;cursor:help;box-shadow:0 3px 0 var(--line)}
+.card .band:hover{filter:brightness(1.12)}.card .band i{font-style:normal;width:15px;height:15px;border-radius:50%;background:#0d0a18;color:var(--tc);display:grid;place-items:center;font-size:10px;margin-left:2px}
+.card .gem{position:absolute;right:12px;top:-12px;width:24px;height:24px;z-index:2}
+.card .dest{width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding-top:8px;border-top:2px dashed rgba(247,240,225,.18);font:700 11px/1.2 "Space Grotesk",sans-serif;letter-spacing:.06em;color:var(--muted)}
+.card .dest svg{flex:none}
+.card.t-coin{--pt:38px;--pl:30px}.card.t-charm{--pt:44px;--pl:46px}.card.t-part{--pt:18px;--pl:24px}.card.t-die{--pt:14px;--pl:22px}
+.card .rbw{animation:spinG 3s linear infinite}
 .card canvas{position:static;width:64px;height:64px}
 .card b{font:19px/1.1 "Archivo Black",sans-serif}
 .card small{font-size:14px;line-height:1.3;color:var(--muted)}
 .card .lv{position:absolute;top:36px;right:8px;padding:2px 7px;border:3px solid var(--line);border-radius:8px;background:var(--pink);color:#0d0a18;font:12px/1.3 "Archivo Black",sans-serif}
 #reroll,#skipUp{min-height:44px;padding:8px 18px;font-weight:700;cursor:pointer}
 #reroll:disabled{opacity:.4;cursor:default}
-@media(max-width:560px){#cards{grid-template-columns:minmax(0,1fr)}.card{grid-template-columns:56px minmax(0,1fr);grid-template-rows:auto auto;text-align:left;justify-items:start;column-gap:12px;row-gap:2px;padding:0 12px 12px}
-  .card .band{grid-column:1/-1;margin-bottom:6px;text-align:center}.card canvas{grid-row:2/4;width:56px;height:56px;align-self:center}.card small{grid-column:2}.card .lv{top:auto;bottom:10px}
+@media(max-width:560px){#cards{grid-template-columns:minmax(0,1fr);gap:18px}.card{grid-template-columns:56px minmax(0,1fr);grid-template-rows:auto auto auto auto;text-align:left;justify-items:start;column-gap:12px;row-gap:3px;padding:12px 14px 12px var(--pl,16px)}
+  .card .band{grid-column:2;margin-bottom:2px}.card canvas{grid-column:1;grid-row:1/5;width:56px;height:56px;align-self:center}.card b,.card small,.card .dest{grid-column:2}.card .dest{border:0;padding:0;justify-content:flex-start;font-size:10.5px}.card .lv{top:auto;bottom:10px}
   #go{height:72px;font-size:34px}}
 #pouchClose,#dieClose,#instClose{flex:none;width:44px;height:44px;font:22px/1 "Archivo Black",sans-serif;cursor:pointer}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px}
@@ -135,13 +141,13 @@ button{font:inherit;color:var(--ink)}
 @keyframes bob{0%,100%{translate:0 0}50%{translate:0 -2px}}
 @keyframes sway{0%,100%{rotate:-1.2deg}50%{rotate:1.2deg}}
 @keyframes float{0%,100%{translate:0 0}50%{translate:0 -4px}}
+@keyframes spinG{to{transform:rotate(360deg)}}
 @keyframes shine{from{background-position:120% 0}to{background-position:-120% 0}}
 .amb #go:not(.ready):not(.hit):not(.wait):not(.down){animation:breathe 3.6s ease-in-out infinite}
 .amb #pouchBtn:not(.bump){animation:bob 5.2s ease-in-out infinite}
 .amb #optBtn{animation:bob 6.1s ease-in-out -2s infinite}
 .amb #lvBox h2,.amb #ovBox h2{animation:slam .45s cubic-bezier(.2,1.7,.4,1),sway 3.4s ease-in-out .45s infinite}
 .amb .card.idle{animation:none;opacity:1;animation:float 3.2s ease-in-out infinite;animation-delay:var(--fd)}
-.amb .card.r2 .band{background:linear-gradient(100deg,var(--pal) 38%,#fff9 50%,var(--pal) 62%);background-size:250% 100%;animation:shine 2.6s linear infinite}
 .amb #again{animation:breathe 3s ease-in-out infinite}
 .amb .prow:nth-child(odd){animation:bob 4.6s ease-in-out infinite}.amb .prow:nth-child(even){animation:bob 4.6s ease-in-out -2.3s infinite}
 </style>
@@ -452,7 +458,7 @@ if(matchMedia('(prefers-reduced-motion: reduce)').matches)cfg.shake=false;
 const pct=()=>Math.round(headsP()*100);
 const POOL=[
   ...[[6,0],[8,0],[10,1],[12,1],[20,2]].map(([n,r])=>({id:'d'+n,die:n,r,w:.55,max:1,name:'d'+n+' die',lvl:()=>0,
-    desc:()=>!S.dice?`Its roll (1–${n}) decides how many coins flip`:line.length>=S.slots?`Slots full: swap it in for something in your lineup`:`Adds a d${n} to the machine (slot ${line.length+1} of ${S.slots})`})),
+    desc:()=>!S.dice?`Its roll (1–${n}) decides how many coins flip`:`Rolls 1–${n}: that many coins spill onto the board each play`})),
   {id:'lines',r:1,max:3,dice:1,name:'Paylines',lvl:()=>S.lineMult-3,desc:()=>`Lines of heads (any row, column or diagonal) pay ×${S.lineMult+1} instead of ×${S.lineMult}`},
   {id:'slots',r:2,max:3,dice:1,name:'Bigger table',lvl:()=>S.slots-5,ok:()=>line.length>=S.slots-1,desc:()=>`Lineup slots ${S.slots} → ${S.slots+1} (room for dice and charms)`},
   {id:'rebate',r:1,max:1,dice:1,name:'Rebate',lvl:()=>dlv('reb'),desc:()=>'Your dice: rolling the max (6 on a d6) refunds a play, once per die per play, up to 5 plays held. Dice added later start without it'},
@@ -461,15 +467,15 @@ const POOL=[
   {id:'poly',r:0,max:99,dice:1,name:'Polyhedral',lvl:()=>S.sides.reduce((a,v)=>a+SIDES.indexOf(v)-1,0),ok:()=>S.sides.some((v,i)=>v<20&&!S.fx[i]),desc:()=>{const m=Math.min(...S.sides.filter((v,i)=>!S.fx[i]));return`Your smallest die, a d${m}, becomes a d${SIDES[SIDES.indexOf(m)+1]}`}},
   {id:'reflip',r:1,max:3,name:'Second chance',lvl:()=>S.reflip,desc:()=>S.reflip?`${S.reflip+1} tails every play get flipped again`:'One tails every play gets flipped again'},
   {id:'loaded',r:1,max:3,dice:1,name:'Loaded dice',lvl:()=>dlv('min')-1,desc:()=>'Your dice: their lowest possible roll goes up by 1. Dice added later start without it'},
-  ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1],['mirror',1,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc+'. Goes in your pouch and joins every play'})),
+  ...[['gold',1,0],['lead',0,0],['wild',1,1],['ember',0,1],['magnet',1,1],['crown',2,1],['mirror',1,1]].map(([t,r,dc])=>({id:'c_'+t,coin:t,r,w:.7,dice:dc,max:99,name:COINS[t].name,lvl:()=>countOf(t),desc:()=>COINS[t].desc})),
   {id:'perf',r:1,max:4,dice:1,name:'Perfectionist',lvl:()=>S.perf-2,desc:()=>`If every coin lands heads, the whole play pays ×${S.perf+1} (was ×${S.perf})`},
   {id:'sixes',r:1,max:4,dice:1,name:'Max roll bonus',lvl:()=>dlv('six')/2,desc:()=>'Your dice: rolling the max (6 on a d6, 20 on a d20) spills 2 extra coins. Dice added later start without it'},
   {id:'boom',r:1,max:3,dice:1,name:'Exploding dice',lvl:()=>dlv('boom'),desc:()=>'Your dice: rolling the max rolls again and adds it on, for more coins. Each level lets it chain one more time. Dice added later start without it'},
-  ...Object.entries(PARTS).map(([id,q])=>({id:'p_'+id,part:id,r:q.r,w:.6,max:1,dice:1,name:q.name,lvl:()=>hasPart(id)?1:0,desc:()=>q.desc+(S.parts.length>=PSLOTS?'. Parts full: swap one out':'')})),
+  ...Object.entries(PARTS).map(([id,q])=>({id:'p_'+id,part:id,r:q.r,w:.6,max:1,dice:1,name:q.name,lvl:()=>hasPart(id)?1:0,desc:()=>q.desc})),
   ...Object.entries(FXD).map(([k,q])=>({id:'x_'+k,die:q.sides,fxd:k,r:q.r,w:.5,max:1,dice:1,name:q.name,lvl:()=>S.fx.includes(k)?1:0,
-    desc:()=>q.desc+(line.length>=S.slots?'. Slots full: swap it in for something in your lineup':'')})),
+    desc:()=>q.desc})),
   ...Object.entries(CH).map(([k,q])=>({id:'k_'+k,charm:k,r:q.r,w:.5,max:1,dice:1,name:q.name,lvl:()=>charms.some(c=>c.id===k)?1:0,
-    desc:()=>q.desc(charms.find(c=>c.id===k))+(line.length>=S.slots?'. Slots full: swap it in for something':'. Takes a lineup slot')})),
+    desc:()=>q.desc(charms.find(c=>c.id===k))})),
   {id:'chain',r:2,max:5,dice:1,name:'Hot streak',lvl:()=>S.chain,desc:()=>`Each heads in a row pays +${S.chain+1} more than the one before (a tails resets the streak)`}
 ];
 // a die upgrade's card level is its lowest level across the dice you own, so it keeps coming until every die has it
@@ -586,7 +592,7 @@ let goHidden=false,over=false,overDelay=-1;
 // shrink single-line text until it fits its box (big numbers on small phones)
 function fitText(el,max,min=12){el.style.fontSize=max+'px';let f=max;while(el.scrollWidth>el.clientWidth+1&&f>min){f--;el.style.fontSize=f+'px'}}
 function fitAll(){document.querySelectorAll('#over .stat b').forEach(e=>fitText(e,30,14));document.querySelectorAll('.card b,.prow b').forEach(e=>{e.classList.add('fit');fitText(e,parseFloat(getComputedStyle(e).fontSize)>19?19:19,12)})}
-addEventListener('resize',()=>{if(over||lvlOpen)fitAll()});
+addEventListener('resize',()=>{if(over||lvlOpen){fitAll();shapeCards()}});
 function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}$('#stLv').textContent=S.lv;$('#stBest').textContent='+'+fmt(S.best);$('#stRecord').textContent=bestLv;
   const short=need()-score.value;$('#ovTitle').textContent=short<=Math.max(2,need()*.2)?'SO CLOSE!':'OUT OF PLAYS';
   const sub=$('#ovSub');sub.textContent='';const addLine=t=>{const e=document.createElement('span');e.textContent=t;sub.appendChild(e)};
@@ -906,20 +912,88 @@ function iconFor(id,c){
     chain:()=>{coin(18,40,14,'#ffc300','');coin(30,28,14,'#ffc300','');coin(42,16,14,'#ffc300','+')}})[id]();
 }
 const RN=['Common','Rare','Legendary'];
+// ---- card types: each has a colour, a silhouette and an explainer ----
+const CT={die:{word:'DIE',col:'#00b7f0'},charm:{word:'CHARM',col:'#ff0d7e'},coin:{word:'COIN',col:'#ffd400'},part:{word:'PART',col:'#ff9300'},up:{word:'UPGRADE',col:'#00dc7d'}};
+const DIEPERK=new Set(['rebate','loaded','sixes','boom','poly']);
+const ctype=p=>p.die?'die':p.charm?'charm':p.coin?'coin':p.part?'part':'up';
+const SVGL='#0d0a18';
+const TGLY={die:`<rect x="-6" y="-6" width="12" height="12" rx="3" fill="#fff" stroke="${SVGL}" stroke-width="2"/><circle cx="-2.5" cy="-2.5" r="1.4" fill="${SVGL}"/><circle cx="2.5" cy="2.5" r="1.4" fill="${SVGL}"/>`,
+  charm:`<path d="M-4,-7 H4 L7,-3 V7 H-7 V-3Z" fill="#fff" stroke="${SVGL}" stroke-width="2" stroke-linejoin="round"/><circle cy="-2.5" r="1.5" fill="${SVGL}"/>`,
+  coin:`<circle r="7" fill="#fff" stroke="${SVGL}" stroke-width="2"/><circle r="4" fill="none" stroke="${SVGL}" stroke-width="1.5"/>`,
+  part:`<polygon points="7.5,0 3.8,6.1 -3.8,6.1 -7.5,0 -3.8,-6.1 3.8,-6.1" fill="#fff" stroke="${SVGL}" stroke-width="2"/><circle r="2.4" fill="${SVGL}"/>`,
+  up:`<path d="M0,-7 L7,0 H3 V7 H-3 V0 H-7Z" fill="#fff" stroke="${SVGL}" stroke-width="2" stroke-linejoin="round"/>`};
+const DGLY={die:'<rect x="-8" y="-6" width="16" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/>',
+  coin:'<path d="M-6,-3 Q-7,7 0,7 Q7,7 6,-3 Z M-4,-3 Q0,-8 4,-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+  part:'<polygon points="7,0 3.5,5.7 -3.5,5.7 -7,0 -3.5,-5.7 3.5,-5.7" fill="none" stroke="currentColor" stroke-width="2"/><circle r="2" fill="currentColor"/>',
+  up:'<circle r="4" fill="none" stroke="currentColor" stroke-width="2"/>'+[0,45,90,135,180,225,270,315].map(a=>`<rect x="-1.5" y="-8" width="3" height="4" fill="currentColor" transform="rotate(${a})"/>`).join('')};
+DGLY.charm=DGLY.die;
+const svgI=(inner,s,vb=9)=>`<svg width="${s}" height="${s}" viewBox="${-vb} ${-vb} ${vb*2} ${vb*2}" aria-hidden="true">${inner}</svg>`;
+// silhouettes: die = chamfered corners, charm = keyring tag, coin = struck arch (a round end on phones), part = notched plate, upgrade = plain slab
+function cardPath(t,w,h,hz){
+  const rr=(r)=>`M${r},0 H${w-r} Q${w},0 ${w},${r} V${h-r} Q${w},${h} ${w-r},${h} H${r} Q0,${h} 0,${h-r} V${r} Q0,0 ${r},0 Z`;
+  if(t==='die'){const c=hz?16:22;return`M${c},0 H${w-c} L${w},${c} V${h-c} L${w-c},${h} H${c} L0,${h-c} V${c} Z`}
+  if(t==='part'){const n=14;return`M${n},0 H${w-n} A${n},${n} 0 0 0 ${w},${n} V${h-n} A${n},${n} 0 0 0 ${w-n},${h} H${n} A${n},${n} 0 0 0 0,${h-n} V${n} A${n},${n} 0 0 0 ${n},0 Z`}
+  if(t==='coin'){if(hz){const r=Math.min(h/2,42);return`M${r},0 H${w-14} Q${w},0 ${w},14 V${h-14} Q${w},${h} ${w-14},${h} H${r} A${r},${r} 0 0 1 0,${h-r} V${r} A${r},${r} 0 0 1 ${r},0 Z`}
+    const a=30;return`M0,${a} Q${w/2},${-a+4} ${w},${a} V${h-14} Q${w},${h} ${w-14},${h} H14 Q0,${h} 0,${h-14} Z`}
+  if(t==='charm'){if(hz){const k=32;return`M${k},0 H${w-14} Q${w},0 ${w},14 V${h-14} Q${w},${h} ${w-14},${h} H${k} L4,${h-24} Q0,${h-28} 0,${h-34} V34 Q0,28 4,24 Z`}
+    const k=Math.min(40,w*.24);return`M${k},0 H${w-k} L${w-4},30 Q${w},34 ${w},40 V${h-14} Q${w},${h} ${w-14},${h} H14 Q0,${h} 0,${h-14} V40 Q0,34 4,30 Z`}
+  return rr(14)}
+let rbN=0;
+function shapeCard(b){const t=b.dataset.t,r=+b.dataset.r,w=b.offsetWidth,h=b.offsetHeight;if(!w||!h)return;const hz=innerWidth<=560,d=cardPath(t,w,h,hz),dep=8,col=CT[t].col,P=12;
+  let x='';
+  if(r===2){const id='rb'+(++rbN);x+=`<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff0d7e"/><stop offset=".35" stop-color="#ffd400"/><stop offset=".7" stop-color="#00b7f0"/><stop offset="1" stop-color="#a64dff"/>${amb()?'<animateTransform attributeName="gradientTransform" type="rotate" from="0 .5 .5" to="360 .5 .5" dur="3s" repeatCount="indefinite"/>':''}</linearGradient></defs>`;
+    var glow=`<path d="${d}" fill="none" stroke="url(#${id})" stroke-width="9" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${SVGL}" stroke-width="2.5" stroke-linejoin="round"/>`}
+  x+=`<path d="${d}" transform="translate(0,${dep+5})" fill="rgba(0,0,0,.4)"/><path d="${d}" transform="translate(0,${dep})" fill="${shade(col,.62)}" stroke="${SVGL}" stroke-width="4" stroke-linejoin="round"/>`;
+  x+=`<path d="${d}" fill="var(--surf)" stroke="${SVGL}" stroke-width="4" stroke-linejoin="round"/>`+(glow||'');
+  if(t==='part')[[22,22],[w-22,22],[22,h-22],[w-22,h-22]].forEach(([a,c])=>{x+=`<circle cx="${a}" cy="${c}" r="4.5" fill="#8c8aa0" stroke="${SVGL}" stroke-width="2.5"/><path d="M${a-2.2},${c-2.2} l4.4,4.4" stroke="${SVGL}" stroke-width="1.5"/>`});
+  if(t==='charm'){const[hx,hy]=hz?[18,h/2]:[w/2,22];if(!hz)x+=`<path d="M${hx},${hy} q-14,-16 -6,-36" stroke="#c9b28a" stroke-width="3" fill="none" stroke-linecap="round"/>`;x+=`<circle cx="${hx}" cy="${hy}" r="7.5" fill="var(--bg)" stroke="${SVGL}" stroke-width="4"/>`}
+  let sv=b.querySelector('.cshape');if(!sv){sv=document.createElementNS('http://www.w3.org/2000/svg','svg');sv.classList.add('cshape');sv.setAttribute('aria-hidden','true');b.prepend(sv)}
+  sv.setAttribute('width',w+P*2);sv.setAttribute('height',h+dep+P*2);sv.setAttribute('viewBox',`${-P} ${-P} ${w+P*2} ${h+dep+P*2}`);sv.innerHTML=x}
+const shapeCards=()=>document.querySelectorAll('#cards .card').forEach(shapeCard);
+function gemSvg(r){const c=r===2?'#ffd400':'#4fa3ff';return`<svg class="gem" viewBox="-11 -11 22 22" aria-hidden="true"><path d="M-7,-4 L-3,-9 H3 L7,-4 L0,9Z" fill="${c}" stroke="${SVGL}" stroke-width="2.5" stroke-linejoin="round"/><path d="M-7,-4 H7 M-3,-9 L-1,-4 L0,9 M3,-9 L1,-4" stroke="${SVGL}" stroke-width="1.2" fill="none" opacity=".55"/><path d="M-4,-6 L-2,-8" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>`}
+// where a card goes, said in its footer
+function destText(p){const t=ctype(p),full=line.length>=S.slots;
+  if(t==='die')return!S.dice?'YOUR FIRST DIE':full?'LINEUP FULL · SWAP ONE':`LINEUP · SLOT ${line.length+1}/${S.slots}`;
+  if(t==='charm')return full?'LINEUP FULL · SWAP ONE':`LINEUP · SLOT ${line.length+1}/${S.slots}`;
+  if(t==='coin')return`POUCH · ${S.pouch.length+1} SPECIAL`;
+  if(t==='part')return S.parts.length>=PSLOTS?'PARTS FULL · SWAP ONE':`PARTS · ${S.parts.length+1}/${PSLOTS}`;
+  return DIEPERK.has(p.id)?'YOUR DICE':'WHOLE MACHINE'}
+// tap a card's type pill: what this kind of upgrade is for
+const TYPEINFO={
+  die:['Dice sit in your lineup and roll left to right every play. Each roll spills that many coins onto the board to flip, so bigger dice mean more coins.','Effect dice also do something on certain faces (shown in colour on their card). Dice share lineup slots with charms; when the lineup is full, a new die swaps out something you pick.','Die upgrades like Exploding or Loaded go on the dice you own when you take them. Tap a die on the board to see its faces and upgrades.'],
+  charm:['Charms share the lineup with your dice. Once a play has settled, they fire left to right on the play\'s total: + charms add, × charms multiply, so their order matters.','Charms that read a roll look at the nearest die to their left. Drag dice and charms to rearrange the lineup between plays, and tap one for its card.'],
+  coin:['Special coins go in your pouch. Every play, all of them are mixed in among the plain coins on the board (if a play spills fewer coins than you have specials, a random few make it).','You can own several of the same coin, and they take no lineup slot. Open the Pouch to see them all.'],
+  part:['Machine parts change the rules for the whole machine, like doubling the coins or spinning the board as slot reels.','You can hold 3. They take no lineup slot, and a 4th swaps one out. They sit as hex nuts at the top right of the tray: tap one to see them all.'],
+  up:['Upgrades improve the machine for the rest of the run and take no slot.','Some upgrade everything (Heavier coins, Paylines, Lucky coins…); die upgrades (Exploding, Loaded, Rebate, Max roll bonus, Polyhedral) apply to the dice you own right now. Tap the chips at the top left of the tray to see them.']};
+function openType(t){const q=CT[t],B=$('#dieBody');B.innerHTML='';
+  const el=(tg,c,x)=>{const e=document.createElement(tg);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+  {const c=$('#dieIco'),g=c.getContext('2d');c.width=c.height=128;g.scale(2,2);const hz=t==='coin'||t==='charm'?false:false,w=44,h=54;g.translate(10,5);
+    const p=new Path2D(cardPath(t,w,h,false));g.save();g.translate(0,6);g.fillStyle=shade(q.col,.62);g.fill(p);g.lineWidth=3;g.strokeStyle=th.line;g.stroke(p);g.restore();g.fillStyle=q.col;g.fill(p);g.lineWidth=3;g.strokeStyle=th.line;g.stroke(p)}
+  $('#dieTitle').textContent=q.word==='UPGRADE'?'Upgrades':q.word[0]+q.word.slice(1).toLowerCase()+(t==='part'?'s (machine parts)':'s');
+  $('#dieSub').textContent={die:'Roll for coins',charm:'Fire left to right on the total',coin:'Live in your pouch',part:'Rewrite the rules',up:'Make the machine better'}[t];
+  B.appendChild(el('h3','ptitle','WHAT THEY DO'));TYPEINFO[t].forEach(x=>B.appendChild(el('p','note',x)));
+  const now={die:`You have ${dice.length} ${dice.length===1?'die':'dice'}; your lineup uses ${line.length} of ${S.slots} slots.`,charm:`You have ${charms.length} charm${charms.length===1?'':'s'}; your lineup uses ${line.length} of ${S.slots} slots.`,
+    coin:`Your pouch holds ${S.pouch.length} special coin${S.pouch.length===1?'':'s'}.`,part:`You have ${S.parts.length} of ${PSLOTS} parts.`,up:''}[t];
+  if(now){B.appendChild(el('h3','ptitle','RIGHT NOW'));B.appendChild(el('p','note',now))}
+  B.appendChild(el('h3','ptitle','READING A CARD'));B.appendChild(el('p','note','The shape and coloured pill show the type. A blue gem means rare; a gold gem and rainbow edge mean legendary. The footer says where it goes.'));
+  dieDlg.classList.add('open');requestAnimationFrame(fitAll);setTimeout(()=>$('#dieClose').focus(),30)}
 function showCards(){
   offersNow=drawOffers();cardsEl.innerHTML='';
   offersNow.forEach((p,i)=>{
-    const b=document.createElement('button');b.className=`card slab r${p.r}`;b.style.animationDelay=(i*.13)+'s';
-    const band=document.createElement('span');band.className='band';band.textContent=RN[p.r]+(p.part?' part':p.charm?' charm':'');
+    const t=ctype(p),b=document.createElement('button');b.className=`card r${p.r} t-${t}`;b.dataset.t=t;b.dataset.r=p.r;b.style.animationDelay=(i*.13)+'s';b.style.setProperty('--tc',CT[t].col);
+    b.setAttribute('aria-label',`${RN[p.r]} ${CT[t].word.toLowerCase()}: ${p.name}. ${p.desc()}`);
+    const band=document.createElement('span');band.className='band';band.title='What are '+CT[t].word.toLowerCase()+' cards?';band.innerHTML=svgI(TGLY[t],14,8)+CT[t].word+'<i>?</i>';
+    band.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();audio();sfx.press();openType(t)});
     const c=document.createElement('canvas');iconFor(p.id,c);
     const nm=document.createElement('b');nm.textContent=p.name;
     const ds=document.createElement('small');ds.textContent=p.desc();
-    b.append(band,c,nm,ds);
+    const dst=document.createElement('span');dst.className='dest';dst.innerHTML=svgI(DGLY[t],15)+'→ '+destText(p);
+    b.append(band,c,nm,ds,dst);if(p.r)b.insertAdjacentHTML('beforeend',gemSvg(p.r));
     if(p.lvl()>0){const l=document.createElement('span');l.className='lv';l.textContent=p.coin?'own '+p.lvl():'LV '+(p.lvl()+1);b.append(l)}
     b.addEventListener('click',()=>pick(p));cardsEl.appendChild(b);
     setTimeout(()=>{sfx.card(i);if(p.r===2)sfx.legend()},i*130+60);
   });
-  requestAnimationFrame(fitAll);
+  requestAnimationFrame(()=>{fitAll();shapeCards()});
   rerollBtn.textContent=`Reroll (${S.rerolls})`;rerollBtn.disabled=S.rerolls<=0;
   setTimeout(()=>{const f=cardsEl.querySelector('.card');if(f)f.focus({preventScroll:true})},450);
 }
@@ -1521,7 +1595,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127061153';let updShown=false,updDismissed='';
+const BUILD='20261127062315';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
