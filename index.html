@@ -402,20 +402,20 @@ const FXD={
   midas:{name:'Midas die',sides:10,faces:[9,10],col:'#ffc984',acc:'#c25a00',r:1,glyph:'×5',tag:'MIDAS',desc:'A d10. On 9 or 10, once everything settles, a tails turns golden (heads, pays ×5)'},
   gamble:{name:'Gamble die',sides:12,faces:[1,12],col:'#ffabcc',acc:'#c40046',r:1,glyph:'±',tag:'GAMBLE',desc:'A d12. Roll 12 and the whole play pays double; roll 1 and it pays half'}};
 // ---- charms: items that take a lineup slot. After a play settles they fire left to right on the play's total ----
-// roll: a trigger on the die directly to the charm's left; cond: the badge under the charm
+// roll: a trigger on the nearest die to the charm's left (other charms in between are skipped); cond: the badge under the charm
 const CH={
   penny:{name:'Penny Jar',r:0,col:'#ffd400',g:'¢',desc:()=>`+${fmt(S.val)} for every heads this play`},
   tip:{name:'Tip Jar',r:0,col:'#00dc7d',g:'$',desc:()=>`+${fmt(S.val*2)} for every tails this play`},
-  even:{name:'Even Keel',r:0,col:'#00b7f0',g:'2·4',cond:'EVEN',roll:v=>v%2===0,desc:()=>`If the die to its left rolls even: +${fmt(S.val*2)} for every heads`},
-  high:{name:'High Roller',r:1,col:'#ff0d7e',g:'×2',cond:'≥5',roll:v=>v>=5,desc:()=>'If the die to its left rolls 5 or more: the play pays ×2'},
-  under:{name:'Underdog',r:1,col:'#ff9300',g:'×3',cond:'1–2',roll:v=>v<=2,desc:()=>'If the die to its left rolls 1 or 2: the play pays ×3'},
+  even:{name:'Even Keel',r:0,col:'#00b7f0',g:'2·4',cond:'EVEN',roll:v=>v%2===0,desc:()=>`If the nearest die to its left rolls even: +${fmt(S.val*2)} for every heads`},
+  high:{name:'High Roller',r:1,col:'#ff0d7e',g:'×2',cond:'≥5',roll:v=>v>=5,desc:()=>'If the nearest die to its left rolls 5 or more: the play pays ×2'},
+  under:{name:'Underdog',r:1,col:'#ff9300',g:'×3',cond:'1–2',roll:v=>v<=2,desc:()=>'If the nearest die to its left rolls 1 or 2: the play pays ×3'},
   ladder:{name:'Ladder',r:1,col:'#9ef7bb',g:'↗',cond:'RISE',desc:()=>`If the dice to its left rolled higher and higher, left to right: +${fmt(S.val*5)} per die in that run (needs 2+)`},
   clover:{name:'Four-Leaf Clover',r:1,col:'#7ee08a',g:'♣',cond:'4+',desc:()=>'If 4 or more coins land heads: the play pays ×1.5'},
   horse:{name:'Horseshoe',r:1,col:'#ffc984',g:'Ω',cond:'LINE',desc:()=>'If a payline paid this play: the play pays ×2'},
   bell:{name:'Bell',r:1,col:'#ffe884',g:'♪',cond:'←',desc:()=>'Fires the charm to its left a second time'},
   copy:{name:'Copycat',r:2,col:'#b8a6ff',g:'=',cond:'→',desc:()=>'Does whatever the charm to its right does'},
   anchor:{name:'Anchor',r:2,col:'#89a1c4',g:'×3',cond:'END',desc:()=>'If it is the last thing in your lineup: the play pays ×3'},
-  thermo:{name:'Thermometer',r:2,col:'#ff6b5a',g:c=>'×'+thermoM(c),cond:'≥5',desc:c=>`Every time the die to its left rolls 5 or more it heats up for good: +0.2×. The play pays ×${c?thermoM(c):1}`}};
+  thermo:{name:'Thermometer',r:2,col:'#ff6b5a',g:c=>'×'+thermoM(c),cond:'≥5',desc:c=>`Every time the nearest die to its left rolls 5 or more it heats up for good: +0.2×. The play pays ×${c?thermoM(c):1}`}};
 const thermoM=c=>+(1+.2*(c?c.v||0:0)).toFixed(1);
 const fxFace=d=>!!(d.fx&&!d.rolling&&FXD[d.fx].faces.includes(d.face));
 const countOf=t=>S.pouch.filter(x=>x===t).length;
@@ -783,17 +783,20 @@ function fireDie(d){
 }
 // ---- charms in play ----
 // a die just landed: the charm directly to its right checks its roll trigger and lights up (Thermometer heats up for good)
-function rollTrigger(d,v){const nx=line[line.indexOf(d)+1];if(!nx||!nx.charm)return;const q=CH[nx.id],th_=nx.id==='thermo';if(!q.roll&&!th_)return;
+function rollTrigger(d,v){let n=0;for(let k=line.indexOf(d)+1;k<line.length&&line[k].charm;k++){const c=line[k],q=CH[c.id];if(q.roll||c.id==='thermo')at(T+.14*n++,()=>trigOne(c,v))}}
+function trigOne(nx,v){const q=CH[nx.id],th_=nx.id==='thermo';
   if(th_?v>=5:q.roll(v)){nx.spark=1;nx.hl=1;nx.j.punch(14).wobble(.35);sfx.ping();
     if(th_){nx.v=(nx.v||0)+1;relink();if(J)world.popText('+0.2× → ×'+thermoM(nx),nx.hx,nx.hy+nx.size*1.3,{size:Math.max(16,nx.size*.36),ci:1,layers:2,life:1})}
     else if(J)world.popText('ON!',nx.hx,nx.hy+nx.size*1.3,{size:Math.max(18,nx.size*.42),ci:4,layers:2,life:.8})}
   else nx.j.shove(120)}
+// roll-reading charms look past other charms to the nearest die on their left
+const dieLeftOf=i=>{for(let k=i-1;k>=0;k--)if(!line[k].charm)return line[k];return null};
 // dice to the left of lineup slot i that rose left to right, counted back from the nearest one
 function riseRun(i){const f=line.slice(0,i).filter(o=>!o.charm&&o.landed).map(o=>o.face);if(!f.length)return 0;let n=1;for(let k=f.length-2;k>=0&&f[k]<f[k+1];k--)n++;return n}
 const headsNow=()=>coins.filter(o=>o.final&&o.res==='h').length,tailsNow=()=>coins.filter(o=>o.final&&o.res!=='h').length;
 // what a charm would do right now: {add} or {mult} with a label, or {miss} with a reason. Copycat and Bell borrow a neighbour's effect
 function evalCharm(c,depth=0){const i=line.indexOf(c),L=line[i-1],Rt=line[i+1],q=CH[c.id],V=S.val,h=headsNow(),t=tailsNow();
-  if(q.roll){if(!L||L.charm)return{miss:'no die to its left'};if(!L.landed||!q.roll(L.face))return{miss:L.landed?'rolled '+L.face:'no roll'}}
+  if(q.roll){const D=dieLeftOf(i);if(!D)return{miss:'no die to its left'};if(!D.landed||!q.roll(D.face))return{miss:D.landed?'rolled '+D.face:'no roll'}}
   const add=(n,x='')=>n>0?{add:n,label:'+'+fmt(n)+x}:{miss:'+0'},mul=m=>({mult:m,label:'×'+m});
   switch(c.id){
     case'penny':return h?add(h*V):{miss:'no heads'};
@@ -811,7 +814,7 @@ function evalCharm(c,depth=0){const i=line.indexOf(c),L=line[i-1],Rt=line[i+1],q
   return{miss:'—'}}
 // badge state while you look at the lineup
 function charmLit(c){const i=line.indexOf(c),L=line[i-1],Rt=line[i+1],q=CH[c.id];
-  if(q.roll||c.id==='thermo')return!!(L&&!L.charm&&L.landed&&(c.id==='thermo'?L.face>=5:q.roll(L.face)));
+  if(q.roll||c.id==='thermo'){const D=dieLeftOf(i);return!!(D&&D.landed&&(c.id==='thermo'?D.face>=5:q.roll(D.face)))}
   return{ladder:()=>riseRun(i)>=2,clover:()=>busy&&headsNow()>=4,horse:()=>busy&&!!(ph.paidKeys&&ph.paidKeys.size),anchor:()=>i===line.length-1,copy:()=>!!(Rt&&Rt.charm),bell:()=>!!(L&&L.charm)}[c.id]?.()??false}
 function fireCharm(c,k){const r=evalCharm(c);c.hl=1;
   if(r.miss){c.j.shove(200).wobble(.2);sfx.tails();if(J)world.popText(r.miss,c.hx,c.hy+c.size*1.3,{size:Math.max(14,c.size*.3),ci:6,life:.8});return}
@@ -1046,7 +1049,7 @@ function openCharm(o){const q=CH[o.id],i=line.indexOf(o),B=$('#dieBody');B.inner
   sec('EFFECT');const r=el('div','prow slab'),tx=el('div'),ic=document.createElement('canvas');charmIcon(ic,o.id,44);tx.append(el('b',null,q.cond?'Trigger: '+q.cond:'Every play'),el('small',null,q.desc(o)));r.append(ic,tx,el('span'));B.appendChild(r);
   if(q.cond)B.appendChild(el('p','note',charmLit(o)?'Its badge is lit: the trigger is met right now.':'Its badge is dark: the trigger is not met right now.'));
   sec('HOW CHARMS WORK');
-  B.appendChild(el('p','note','Charms share the lineup with your dice. Once a play has settled, they fire left to right on the play\'s total, so put + charms before × charms. A charm that reads a roll looks at the die directly to its left. Drag anything in the lineup to rearrange it between plays.'));
+  B.appendChild(el('p','note','Charms share the lineup with your dice. Once a play has settled, they fire left to right on the play\'s total, so put + charms before × charms. A charm that reads a roll looks at the nearest die to its left, skipping over other charms, so one die can set off several charms in a row. Drag anything in the lineup to rearrange it between plays.'));
   dieDlg.classList.add('open');requestAnimationFrame(fitAll);setTimeout(()=>$('#dieClose').focus(),30)}
 const statAt=(x,y)=>statHits.some(h=>Math.hypot(x-h.x,y-h.y)<h.r);
 const closeDie=()=>dieDlg.classList.remove('open');
@@ -1184,7 +1187,7 @@ function charmFace(g,id,s,c){const q=CH[id],w=s*.96,h=s*1.12,P=tagPts(w,h,s*.2),
   const t=typeof q.g==='function'?q.g(c):q.g;g.fillStyle='#0d0a18';g.font=`${Math.round(s*(t.length>3?.27:t.length>2?.32:t.length>1?.4:.52))}px "Archivo Black", Impact, sans-serif`;g.textAlign='center';g.textBaseline='middle';g.fillText(t,0,h*.1)}
 function charmIcon(c,id,size){const g=c.getContext('2d');c.width=c.height=size*2;g.scale(2,2);g.translate(size/2,size/2-size*.06);charmFace(g,id,size*.62,charms.find(o=>o.id===id))}
 function drawCharm(c){const j=c.j,t=j.xf(),s=c.size;if(t.s<.02)return;const q=CH[c.id],a=J?Math.max(j.motion,c.hl,c.dragging?1:0):0,step=cycleIndex();
-  const L=line[line.indexOf(c)-1];
+  const L=dieLeftOf(line.indexOf(c));
   if(c.spark>.02&&L&&J){const n=7,x0=L.j.p.x.x,y0=L.j.p.y.x,x1=t.x,y1=t.y,P=[];for(let k=0;k<=n;k++){const u=k/n;P.push([x0+(x1-x0)*u,y0+(y1-y0)*u+(k%n?(k%2?-1:1)*s*.18:0)])}
     ctx.save();ctx.globalAlpha=Math.min(1,c.spark*1.4);ctx.lineJoin='round';ctx.beginPath();P.forEach(([x,y],k)=>k?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.lineWidth=s*.16;ctx.strokeStyle=th.line;ctx.stroke();ctx.lineWidth=s*.08;ctx.strokeStyle=pal(step+1);ctx.stroke();ctx.restore()}
   if(cfg.shadow&&a>.02)for(let k=cfg.layers-1;k>=0;k--){const z=j.shadowXf(k,cfg.offset*s/40);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(z.x,z.y);ctx.rotate(z.r);ctx.scale(z.s,z.s);ptsPath(ctx,tagPts(s*.96,s*1.12,s*.2));ctx.fillStyle=pal(step+j.ci+k*2);ctx.fill();ctx.lineWidth=Math.max(2,s*.06);ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
@@ -1516,7 +1519,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127054922';let updShown=false,updDismissed='';
+const BUILD='20261127055357';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
