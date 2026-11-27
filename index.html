@@ -587,8 +587,8 @@ function fitAll(){document.querySelectorAll('#over .stat b').forEach(e=>fitText(
 addEventListener('resize',()=>{if(over||lvlOpen)fitAll()});
 function openOver(){over=true;if(S.lv>bestLv){bestLv=S.lv;try{localStorage.setItem('oddsEngine.bestLv',bestLv)}catch(e){}}$('#stLv').textContent=S.lv;$('#stBest').textContent='+'+fmt(S.best);$('#stRecord').textContent=bestLv;
   const short=need()-score.value;$('#ovTitle').textContent=short<=Math.max(2,need()*.2)?'SO CLOSE!':'OUT OF PLAYS';
-  const sub=$('#ovSub');sub.textContent='';const line=t=>{const e=document.createElement('span');e.textContent=t;sub.appendChild(e)};
-  if(short<=Math.max(2,need()*.2))line(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)line(`Your machine: ${line.map(o=>o.charm?CH[o.id].name:o.fx?FXD[o.fx].name:'d'+o.sides).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
+  const sub=$('#ovSub');sub.textContent='';const addLine=t=>{const e=document.createElement('span');e.textContent=t;sub.appendChild(e)};
+  if(short<=Math.max(2,need()*.2))addLine(`Just ${fmt(short)} short of level ${S.lv+1}.`);if(dice.length)addLine(`Your machine: ${line.map(o=>o.charm?CH[o.id].name:o.fx?FXD[o.fx].name:'d'+o.sides).concat(S.parts.map(id=>PARTS[id].name)).join(' · ')}`);
   $('#over').classList.add('open');fitAll();setTimeout(()=>$('#again').focus(),50)}
 function newRun(){$('#over').classList.remove('open');over=false;overDelay=-1;Object.assign(S,FRESH);S.sides=[];S.pouch=[...FRESH.pouch];S.parts=[];S.fx=[];S.dp=[];S.charms=[];S.lineup=[];freePips.clear();bag=[];pouchBump();score.value=score.shown=0;world.coins=[];
   clearLine();clearCoins();events=[];busy=false;save();layout();const s=coinSlots(1)[0];coins=[makeCoin(s.x,s.y,s,false)];sfx.buy()}
@@ -1516,7 +1516,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127054341';let updShown=false,updDismissed='';
+const BUILD='20261127054922';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
