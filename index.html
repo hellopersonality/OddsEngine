@@ -134,6 +134,15 @@ button{font:inherit;color:var(--ink)}
 .tog{min-height:38px;padding:6px 12px;font-size:13px;cursor:pointer}
 .tog[aria-pressed=false]{opacity:.55}
 #panel{display:none;gap:8px;justify-items:end;position:absolute;right:0;bottom:calc(100% + 14px)}#panel .tog{white-space:nowrap}#panel.open{display:grid}
+/* volume block: three chunky sliders */
+.vol{--dp:4px;display:grid;grid-template-columns:max-content 120px;align-items:center;gap:4px 10px;padding:8px 12px;background:var(--btn);color:#0a0812;font:13px/1 "Archivo Black",sans-serif}
+.vol label{text-align:right;min-width:max-content}
+.vol input[type=range]{width:120px!important}
+.vol input[type=range]{-webkit-appearance:none;appearance:none;width:130px;height:28px;background:none;margin:0;cursor:pointer}
+.vol input[type=range]::-webkit-slider-runnable-track{height:10px;border-radius:6px;background:var(--line)}
+.vol input[type=range]::-moz-range-track{height:10px;border-radius:6px;background:var(--line)}
+.vol input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-6px;border-radius:50%;background:var(--yellow);border:3px solid var(--line);box-shadow:0 3px 0 var(--line)}
+.vol input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--yellow);border:3px solid var(--line);box-shadow:0 3px 0 var(--line)}
 #lvl,#over{position:fixed;inset:0;z-index:5;display:none;place-items:center;padding:14px;background:rgba(10,10,12,.62);overflow:auto}
 #lvl.open,#over.open{display:grid}
 #lvBox,#ovBox{width:100%;max-width:760px;display:grid;gap:14px;justify-items:center}
@@ -192,6 +201,11 @@ button{font:inherit;color:var(--ink)}
     <button class="tog slab" id="tJuice" aria-pressed="true">Juice</button>
     <button class="tog slab" id="tSlow" aria-pressed="false">Slow-mo</button>
     <button class="tog slab" id="tSound" aria-pressed="true">Sound</button>
+    <div class="vol slab" role="group" aria-label="Volume">
+      <label for="vMaster">Volume</label><input type="range" id="vMaster" min="0" max="100" step="1">
+      <label for="vMusic">Music</label><input type="range" id="vMusic" min="0" max="100" step="1">
+      <label for="vSfx">Effects</label><input type="range" id="vSfx" min="0" max="100" step="1">
+    </div>
     <button class="tog slab" id="tSkin" aria-pressed="false">Light mode</button>
     <button class="tog slab" id="tReset">Reset save</button>
   </div>
@@ -333,11 +347,30 @@ class CountUp{
 }
 
 // ================= audio =================
-let ac=null,sound=true,nb=null,lastHead=0;
-function audio(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){ac=null}}if(ac&&ac.state==='suspended')ac.resume().catch(()=>{})}
-function tone(f,d,type='square',v=.06,f2){if(!ac||!sound)return;const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(ac.destination);o.start(t);o.stop(t+d+.02)}
+let ac=null,sound=(()=>{try{return localStorage.getItem('oddsEngine.audio.on')!=='0'}catch(e){return true}})(),nb=null,lastHead=0;
+// mixer: sound effects and music each have a bus into a master bus; the three volumes are saved
+const VOLK='oddsEngine.audio';let vol=(()=>{try{return Object.assign({master:.8,music:.6,sfx:.9},JSON.parse(localStorage.getItem(VOLK)||'{}'))}catch(e){return{master:.8,music:.6,sfx:.9}}})();
+let masterBus=null,sfxBus=null,musicBus=null;
+const curve=x=>x*x; // perceptual: sliders feel even across their range
+function applyVol(){if(!ac)return;const t=ac.currentTime;masterBus.gain.setTargetAtTime(sound?curve(vol.master):0,t,.03);sfxBus.gain.setTargetAtTime(curve(vol.sfx),t,.03);musicBus.gain.setTargetAtTime(curve(vol.music)*.7,t,.03)}
+function saveVol(){try{localStorage.setItem(VOLK,JSON.stringify(vol))}catch(e){}}
+function audio(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)();masterBus=ac.createGain();sfxBus=ac.createGain();musicBus=ac.createGain();sfxBus.connect(masterBus);musicBus.connect(masterBus);masterBus.connect(ac.destination);applyVol();startMusic()}catch(e){ac=null}}if(ac&&ac.state==='suspended'&&!document.hidden)ac.resume().catch(()=>{})}
+// background music: one seamless loop, decoded once and looped sample-accurately by Web Audio
+const MUSIC_FRAMES=1087010,MUSIC_RATE=48000;let musicSrc=null,musicLoading=false;
+function startMusic(){if(!ac||musicSrc||musicLoading)return;musicLoading=true;
+  fetch('music.mp3').then(r=>r.arrayBuffer()).then(b=>new Promise((ok,no)=>ac.decodeAudioData(b,ok,no))).then(buf=>{
+    const len=MUSIC_FRAMES/MUSIC_RATE,src=ac.createBufferSource();src.buffer=buf;src.loop=true;
+    // decoders that don't trim the MP3's encoder delay leave ~1105 samples of silence at the start: skip them
+    const lead=buf.duration-len>.015?1105/MUSIC_RATE:0;src.loopStart=lead;src.loopEnd=Math.min(buf.duration,lead+len);
+    src.connect(musicBus);src.start(0,lead);musicSrc=src;
+    // fade in rather than snap on
+    const t=ac.currentTime;musicBus.gain.cancelScheduledValues(t);musicBus.gain.setValueAtTime(0,t);musicBus.gain.linearRampToValueAtTime(curve(vol.music)*.7,t+1.5)
+  }).catch(()=>{}).finally(()=>{musicLoading=false})}
+// the music (and everything else) pauses while the game is in the background
+document.addEventListener('visibilitychange',()=>{if(!ac)return;if(document.hidden)ac.suspend().catch(()=>{});else ac.resume().catch(()=>{})});
+function tone(f,d,type='square',v=.06,f2){if(!ac||!sound)return;const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(sfxBus);o.start(t);o.stop(t+d+.02)}
 function noise(d,v=.08,freq=2000){if(!ac||!sound)return;if(!nb){nb=ac.createBuffer(1,ac.sampleRate*.5,ac.sampleRate);const a=nb.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=Math.random()*2-1}
-  const t=ac.currentTime,s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();s.buffer=nb;f.type='bandpass';f.frequency.value=freq;f.Q.value=1.2;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);s.connect(f).connect(g).connect(ac.destination);s.start(t);s.stop(t+d)}
+  const t=ac.currentTime,s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();s.buffer=nb;f.type='bandpass';f.frequency.value=freq;f.Q.value=1.2;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);s.connect(f).connect(g).connect(sfxBus);s.start(t);s.stop(t+d)}
 const SC=[0,2,4,7,9];
 const sfx={
   heads(k){const now=performance.now();if(now-lastHead<16)return;lastHead=now;const n=SC[k%5]+12*Math.floor(k/5),f=Math.min(523*Math.pow(2,n/12),4000);tone(f,.09,'square',.03);tone(f*2,.05,'triangle',.025)},
@@ -1757,7 +1790,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261128013657';let updShown=false,updDismissed='';
+const BUILD='20261128020308';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1802,7 +1835,13 @@ $('#optBtn').addEventListener('click',()=>{const p=$('#panel'),o=!p.classList.co
 addEventListener('pointerdown',e=>{if(optOpen()&&!e.target.closest('#opt')){e.stopPropagation();e.preventDefault();closeOpt()}},true);
 $('#tJuice').addEventListener('click',e=>{J=!J;setTimeout(syncAmb);cfg.shadow=cfg.cycle=cfg.punch=J;cfg.shake=J&&!matchMedia('(prefers-reduced-motion: reduce)').matches;tog(e.currentTarget,J)});
 $('#tSlow').addEventListener('click',e=>{cfg.timeScale=cfg.timeScale===1?.2:1;tog(e.currentTarget,cfg.timeScale!==1)});
-$('#tSound').addEventListener('click',e=>{sound=!sound;tog(e.currentTarget,sound)});
+$('#tSound').addEventListener('click',e=>{sound=!sound;tog(e.currentTarget,sound);applyVol();try{localStorage.setItem(VOLK+'.on',sound?'1':'0')}catch(_){}});
+tog($('#tSound'),sound);
+// browsers only allow sound after a gesture: the first tap, click or key anywhere starts the audio (and the music)
+['pointerup','keydown'].forEach(t=>addEventListener(t,()=>audio(),{once:true}));
+// volume sliders
+[['vMaster','master'],['vMusic','music'],['vSfx','sfx']].forEach(([id,k])=>{const el=$('#'+id);el.value=Math.round(vol[k]*100);
+  el.addEventListener('input',()=>{vol[k]=el.value/100;applyVol();saveVol()});el.addEventListener('change',()=>{if(k!=='music'){audio();sfx.ping()}})});
 function applySkin(){syncEra(true);document.documentElement.dataset.skin=skin;$('#tSkin').setAttribute('aria-pressed',skin==='light'?'true':'false');try{localStorage.setItem('oddsEngine.skin',skin)}catch(e){}}
 $('#tSkin').addEventListener('click',()=>{skin=skin==='dark'?'light':'dark';applySkin()});
 applySkin();
