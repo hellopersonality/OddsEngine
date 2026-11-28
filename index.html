@@ -793,16 +793,25 @@ function wheelLift(e){if(sw||menuOpen)return;
     if(!J){e.preventDefault();wh={acc:0,plain:true};}
     else{const o=swipeStart({pointerId:-1,clientX:0,clientY:0,timeStamp:e.timeStamp});if(!o)return;wh=sw;sw=null;wh.acc=0;wh.t0=e.timeStamp;wh.last=[];liftOn(wh)}}
   e.preventDefault();
-  const d=Math.abs(e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*400:e.deltaY)+Math.abs(e.deltaMode?0:e.deltaX)*.3;wh.acc+=d;
-  clearTimeout(wh.timer);
-  if(wh.plain){if(wh.acc>160){wh=null;tryPlay()}else wh.timer=setTimeout(()=>{wh=null},180);return}
+  // a mouse wheel moves in notches, spaced further apart than trackpad events: each notch is a fixed step of the climb
+  // (3 notches drop the token in) and the token waits longer between notches before falling back
+  const notch=wheelNotch(e);if(notch)wh.notch=true;
+  const need=wh.plain?160:Math.max(150,wh.dist*1.1);
+  const d=notch?need/2.9:Math.abs(e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*400:e.deltaY)+Math.abs(e.deltaMode?0:e.deltaX)*.3;wh.acc+=d;
+  clearTimeout(wh.timer);const wait=wh.notch?420:170;
+  if(wh.plain){if(wh.acc>need){wh=null;tryPlay()}else wh.timer=setTimeout(()=>{wh=null},wait+10);return}
+  const gap=wh.lastT===undefined?250:e.timeStamp-wh.lastT;wh.lastT=e.timeStamp;
   wh.last.push({d,t:e.timeStamp});while(wh.last.length>1&&e.timeStamp-wh.last[0].t>120)wh.last.shift();
-  const need=Math.max(150,wh.dist*1.1);wh.dy=-Math.min(1,wh.acc/need)*wh.dist;wh.dx=0;
+  wh.dy=-Math.min(1,wh.acc/need)*wh.dist;wh.dx=0;
   const p=liftDraw(wh,e.timeStamp),o=wh;
-  // speed of the last moments of scrolling, scaled to feel like a finger flick
-  const spd=()=>{const L=o.last,span=Math.max(16,L[L.length-1].t-L[0].t);return L.reduce((a,q)=>a+q.d,0)/span*.45};
+  // speed of the last moments of scrolling, scaled to feel like a finger flick; for a wheel, quicker spinning hits harder
+  const spd=()=>{if(o.notch)return Math.max(.6,Math.min(1.6,.6+(260-gap)/180));const L=o.last,span=Math.max(16,L[L.length-1].t-L[0].t);return L.reduce((a,q)=>a+q.d,0)/span*.45};
   if(p>=1){wh=null;liftLaunch(o,Math.max(.6,spd()));return}
-  wh.timer=setTimeout(()=>{if(wh!==o)return;wh=null;if(p>.55)liftLaunch(o,Math.max(.6,spd()));else liftDrop(o)},170)}
+  wh.timer=setTimeout(()=>{if(wh!==o)return;wh=null;if(p>.55)liftLaunch(o,Math.max(.6,spd()));else liftDrop(o)},wait)}
+// mouse wheel notch vs trackpad: line/page delta modes are always a wheel (Firefox); in pixel mode a wheel click reports
+// a whole multiple of 120 in wheelDeltaY with a big, purely vertical delta, which trackpads almost never do
+function wheelNotch(e){if(e.deltaMode)return true;const w=e.wheelDeltaY;
+  return !!w&&w%120===0&&e.deltaX===0&&Math.abs(e.deltaY)>=50&&Number.isInteger(e.deltaY)}
 addEventListener('wheel',wheelLift,{passive:false});
 // first-run callout on touch screens: shown until a few swipes (or taps) have happened, then never again
 const HINTK='oddsEngine.swipeHint',touchy=matchMedia('(pointer:coarse)').matches;
@@ -1876,7 +1885,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261128160539';let updShown=false,updDismissed='';
+const BUILD='20261128161423';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
