@@ -830,7 +830,9 @@ const IDLE_HINT=7;let idleT=0;
 function noteHint(k){if(!hintOn())return;hintN[k[0]]++;try{localStorage.setItem(HINTK,JSON.stringify(hintN))}catch(e){}go.classList.toggle('hint',hintOn())}
 function makeCoin(x,y,s,hidden){const j=world.add(new Juicy(x,y,{from:0,k:430,z:.55}));if(hidden)j.s.t=0;else j.pop();
   return{id:++coinId,j,r:s.r,tx:s.x,ty:s.y,face:null,res:null,gold:false,flipping:false,t0:0,dur:FLIP,dim:0,hl:0,hidden}}
-function spawnCoin(c){c.hidden=false;c.j.s.t=1;c.j.s.v+=8;c.j.moveTo(c.tx,c.ty);c.j.wobble(.45)}
+function spawnCoin(c){c.hidden=false;c.j.s.t=1;c.j.s.v+=8;c.j.moveTo(c.tx,c.ty);c.j.wobble(.45);
+  // arcs: a toss up and to one side, so each coin curves out of its die instead of sliding in a straight line
+  if(cfg.punch){const dx=c.tx-c.j.p.x.x;c.j.p.y.v-=420+Math.random()*320;c.j.p.x.v+=-Math.sign(dx||1)*(60+Math.random()*120)+(Math.random()-.5)*160}}
 function clearCoins(){coins.forEach(c=>{c.j.hide();fading.push(c)});coins=[]}
 const roll=d=>{const lo=Math.min(d.p.min,d.sides);return lo+Math.floor(Math.random()*(d.sides-lo+1))};
 const anyFace=d=>1+Math.floor(Math.random()*d.sides);
@@ -965,7 +967,7 @@ function startFlip(c,tz){
   if(tz){c.dur=TEASE;c.spins=c.res==='h'?14:15;c.tease=true;tease={c,line:tz};ph.teased++;tz.cs.forEach(o=>o.hl=1);
     c.j.s.t=1.35;c.j.moveTo(c.tx,c.ty-c.r*.5);if(cfg.punch)c.j.p.y.v-=c.r*14;
     for(let k=0;k<=16;k++)at(T+TEASE*(1-Math.pow(1-k/16,1.7))*.95,()=>sfx.drum(k/16));world.shake(.08)}
-  else{c.dur=FLIP;c.spins=c.res==='h'?6:7;if(cfg.punch)c.j.p.y.v-=c.r*24}
+  else{c.dur=FLIP;c.spins=c.res==='h'?6:7}
   c.j.punch(5);sfx.flip();at(T+c.dur,()=>resolveCoin(c));
 }
 function payLine(l){
@@ -1497,10 +1499,13 @@ function glyph(g,type,r,dir){
 }
 function drawCoin(c){
   const j=c.j,t=j.xf();if(t.s<.02)return;const r=c.r;let w=1,face=c.face||'h';
-  if(c.flipping){const p0=Math.min(1,(T-c.t0)/c.dur),p=c.tease?1-Math.pow(1-p0,3):p0,ang=p*(c.spins||(c.res==='h'?6:7))*Math.PI,cs=Math.cos(ang);w=Math.abs(cs);face=cs>=0?'h':'t'}
+  let hop=()=>0;
+  if(c.flipping){const p0=Math.min(1,(T-c.t0)/c.dur),p=c.tease?1-Math.pow(1-p0,3):1-Math.pow(1-p0,1.6),ang=p*(c.spins||(c.res==='h'?6:7))*Math.PI,cs=Math.cos(ang);w=Math.abs(cs);face=cs>=0?'h':'t';
+    // gravity hop: fast up, hangs at the top, falls back down and lands as the flip resolves (shadow copies trail a little behind)
+    if(!c.tease&&cfg.punch)hop=(lag=0)=>{const q=Math.max(0,Math.min(1,p0-lag*(1-p0)));return 4*q*(1-q)*r*1.1}}
   const typ=c.look||c.type||'plain',spec=typ!=='plain',gold=typ==='gold',ew=r*Math.max(.1,w),step=cycleIndex(),a=J?Math.max(j.motion,c.hl,c.flipping?.8:0,gold?.6:0):0,Hd=face==='h',lw=Math.max(2,r*.08);
-  if(cfg.shadow&&a>.02&&!(c.ra<1))for(let L=(gold?2:cfg.layers)-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*r/30);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y);ctx.rotate(q.r);ctx.scale(q.s*(q.sx??1),q.s*(q.sy??1));ctx.fillStyle=pal(step+j.ci+L*2);ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
-  ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s*(t.sx??1),t.s*(t.sy??1));if(tease&&c!==tease.c&&!tease.line.cs.includes(c))ctx.globalAlpha=.28;if(c.ra<1)ctx.globalAlpha*=Math.max(0,c.ra);
+  if(cfg.shadow&&a>.02&&!(c.ra<1))for(let L=(gold?2:cfg.layers)-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*r/30);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y-hop((L+1)*.05));ctx.rotate(q.r);ctx.scale(q.s*(q.sx??1),q.s*(q.sy??1));ctx.fillStyle=pal(step+j.ci+L*2);ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
+  ctx.save();ctx.translate(t.x,t.y-hop());ctx.scale(t.s*(t.sx??1),t.s*(t.sy??1));if(tease&&c!==tease.c&&!tease.line.cs.includes(c))ctx.globalAlpha=.28;if(c.ra<1)ctx.globalAlpha*=Math.max(0,c.ra);
   const dim=c.dim&&!c.flipping,blank=!c.face&&!c.flipping,fill=blank?th.blank:Hd?COINS[typ].col:dim?th.tails:th.mid,clw=Math.max(3,r*.11);
   chunkBase(ctx,rotPts(ellPts(ew,r),t.r),Math.max(3,r*.2),fill,clw);ctx.rotate(t.r);
   ctx.fillStyle=fill;ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=clw;ctx.strokeStyle=th.line;ctx.stroke();
@@ -1896,7 +1901,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261128164417';let updShown=false,updDismissed='';
+const BUILD='20261128164942';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
