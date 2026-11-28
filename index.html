@@ -372,11 +372,14 @@ class CountUp{
 let ac=null,sound=(()=>{try{return localStorage.getItem('oddsEngine.audio.on')!=='0'}catch(e){return true}})(),nb=null,lastHead=0;
 // mixer: sound effects and music each have a bus into a master bus; the three volumes are saved
 const VOLK='oddsEngine.audio';let vol=(()=>{try{return Object.assign({master:.8,music:.6,sfx:.9},JSON.parse(localStorage.getItem(VOLK)||'{}'))}catch(e){return{master:.8,music:.6,sfx:.9}}})();
-let masterBus=null,sfxBus=null,musicBus=null;
+let masterBus=null,sfxBus=null,musicBus=null,limiter=null;
+// level boosts: the music file is mastered quiet and the synth effects are generated at low levels, so both get makeup gain;
+// a limiter on the output (see audio()) keeps big moments from clipping
+const MUSIC_GAIN=2.4,SFX_GAIN=3;
 const curve=x=>x*x; // perceptual: sliders feel even across their range
-function applyVol(){if(!ac)return;const t=ac.currentTime;masterBus.gain.setTargetAtTime(sound?curve(vol.master):0,t,.03);sfxBus.gain.setTargetAtTime(curve(vol.sfx),t,.03);musicBus.gain.setTargetAtTime(curve(vol.music)*.7,t,.03)}
+function applyVol(){if(!ac)return;const t=ac.currentTime;masterBus.gain.setTargetAtTime(sound?curve(vol.master):0,t,.03);sfxBus.gain.setTargetAtTime(curve(vol.sfx)*SFX_GAIN,t,.03);musicBus.gain.setTargetAtTime(curve(vol.music)*MUSIC_GAIN,t,.03)}
 function saveVol(){try{localStorage.setItem(VOLK,JSON.stringify(vol))}catch(e){}}
-function audio(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)();masterBus=ac.createGain();sfxBus=ac.createGain();musicBus=ac.createGain();sfxBus.connect(masterBus);musicBus.connect(masterBus);masterBus.connect(ac.destination);applyVol();startMusic()}catch(e){ac=null}}if(ac&&ac.state==='suspended'&&!document.hidden)ac.resume().catch(()=>{})}
+function audio(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)();masterBus=ac.createGain();sfxBus=ac.createGain();musicBus=ac.createGain();sfxBus.connect(masterBus);musicBus.connect(masterBus);limiter=ac.createDynamicsCompressor();limiter.threshold.value=-6;limiter.knee.value=4;limiter.ratio.value=20;limiter.attack.value=.002;limiter.release.value=.15;masterBus.connect(limiter);limiter.connect(ac.destination);applyVol();startMusic()}catch(e){ac=null}}if(ac&&ac.state==='suspended'&&!document.hidden)ac.resume().catch(()=>{})}
 // background music: one seamless loop, decoded once and looped sample-accurately by Web Audio
 const MUSIC_FRAMES=1087010,MUSIC_RATE=48000;let musicSrc=null,musicLP=null,musicLoading=false;
 function startMusic(){if(!ac||musicSrc||musicLoading)return;musicLoading=true;
@@ -388,7 +391,7 @@ function startMusic(){if(!ac||musicSrc||musicLoading)return;musicLoading=true;
     musicLP=ac.createBiquadFilter();musicLP.type='lowpass';musicLP.frequency.value=20000;musicLP.Q.value=.9;
     src.connect(musicLP);musicLP.connect(musicBus);src.start(0,lead);musicSrc=src;mt.r=1;mt.lp=20000;
     // fade in rather than snap on
-    const t=ac.currentTime;musicBus.gain.cancelScheduledValues(t);musicBus.gain.setValueAtTime(0,t);musicBus.gain.linearRampToValueAtTime(curve(vol.music)*.7,t+1.5)
+    const t=ac.currentTime;musicBus.gain.cancelScheduledValues(t);musicBus.gain.setValueAtTime(0,t);musicBus.gain.linearRampToValueAtTime(curve(vol.music)*MUSIC_GAIN,t+1.5)
   }).catch(()=>{}).finally(()=>{musicLoading=false})}
 // the music follows the game: when a run is lost it winds down like a tape slowing (pitch drops with it) and spins back up on a new run;
 // while the level-up cards are open it's muffled by a low-pass sweep, and opens back up when you pick
@@ -1901,7 +1904,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261128164942';let updShown=false,updDismissed='';
+const BUILD='20261128165705';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
