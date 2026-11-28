@@ -79,10 +79,10 @@ button{font:inherit;color:var(--ink)}
 .stk{position:absolute;filter:drop-shadow(0 calc(var(--u)*4px) 0 var(--line))}
 .stk svg{display:block}
 .stk .pl{padding:3px;background:#fff;border:3px solid var(--line);border-radius:12px}
-.stk .pi{padding:calc(var(--u)*7px) calc(var(--u)*11px);border-radius:8px;font:calc(var(--u)*15px)/1.05 "Archivo Black",sans-serif;white-space:nowrap;color:#0a0812;text-align:center}
-.stk.sten{filter:none;font:calc(var(--u)*30px)/.95 "Archivo Black",sans-serif;letter-spacing:.06em;color:rgba(247,240,225,.42);text-align:center;-webkit-mask-image:repeating-linear-gradient(90deg,#000 0 9px,transparent 9px 11px);mask-image:repeating-linear-gradient(90deg,#000 0 9px,transparent 9px 11px)}
+.stk .pi{padding:calc(var(--su,var(--u))*7px) calc(var(--su,var(--u))*11px);border-radius:8px;font:calc(var(--su,var(--u))*15px)/1.05 "Archivo Black",sans-serif;white-space:nowrap;color:#0a0812;text-align:center}
+.stk.sten{filter:none;font:calc(var(--su,var(--u))*30px)/.95 "Archivo Black",sans-serif;letter-spacing:.06em;color:rgba(247,240,225,.42);text-align:center;-webkit-mask-image:repeating-linear-gradient(90deg,#000 0 9px,transparent 9px 11px);mask-image:repeating-linear-gradient(90deg,#000 0 9px,transparent 9px 11px)}
 .stk .tape{padding:calc(var(--u)*5px) 0;background:repeating-linear-gradient(-45deg,#ffd400 0 12px,#0a0812 12px 24px);border:3px solid var(--line)}
-.stk .tape b{display:block;margin:0 auto;width:max-content;padding:3px 9px;background:#ffd400;border:3px solid var(--line);font:400 calc(var(--u)*12px)/1 "Archivo Black",sans-serif;color:#0a0812}
+.stk .tape b{display:block;margin:0 auto;width:max-content;padding:3px 9px;background:#ffd400;border:3px solid var(--line);font:400 calc(var(--su,var(--u))*12px)/1 "Archivo Black",sans-serif;color:#0a0812}
 #go.measure #goHint{display:block;visibility:hidden}
 /* the coin cup: the bottom of the front, full width, is the swipe zone so any thumb and any grip can catch it */
 #goStack{position:absolute;left:0;right:0;bottom:0;height:calc(var(--tw)*2.75)}
@@ -652,13 +652,13 @@ function renderStack(){const box=$('#goStack'),c=calibrating(),n=c?2:S.left,key=
 const goWrap=$('#goWrap');let stkW=0,stkH=0;
 function placeGo(){const bz=9,x=trayX+bz+5,y=Math.max(coinTop-12,line.length?Math.round(Math.max(...line.map(o=>o.hy+o.size*(!o.charm&&o.sides!==6?1.42:1.12)))+4):0),w=trayW-bz*2-10,h=Math.max(120,playBot-bz-5-y);
   Object.assign(goWrap.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
-  const u=Math.max(.55,Math.min(1.2,h/600,w/330));go.style.setProperty('--u',u.toFixed(3));
+  const u=Math.max(.55,Math.min(1.2,h/600,w/330));go.style.setProperty('--u',u.toFixed(3));go.style.setProperty('--su',Math.max(u,Math.min(1.15,w/560)).toFixed(3));
   if(Math.abs(w-stkW)>8||Math.abs(h-stkH)>8){stkW=w;stkH=h;requestAnimationFrame(dealStickers)}
   // how far the hint's ghost token rises: from the cup up to the slot
   requestAnimationFrame(()=>{const sl=$('#goSlit').getBoundingClientRect(),tr=$('#goStack').getBoundingClientRect();go.style.setProperty('--hy',Math.max(60,(tr.bottom-u*TOKU*1.95)-(sl.top+sl.height*.4))+'px')})}
 // the sticker set: every sticker hints at the one action (flick a token up into the slot, push to play) without spelling it out.
 // Drawn in the era's colours (--s1..--s3 accents, --tag) so every era has its own look; outlines, white die-cut edges, hard shadow
-const rpick=a=>a[Math.floor(Math.random()*a.length)],U=n=>`calc(var(--u)*${n*1.2}px)`,ACC=()=>rpick(['var(--s1)','var(--s2)','var(--s3)','var(--tag)']);
+const rpick=a=>a[Math.floor(Math.random()*a.length)],U=n=>`calc(var(--su,var(--u))*${n*1.2}px)`,ACC=()=>rpick(['var(--s1)','var(--s2)','var(--s3)','var(--tag)']);
 const K='#0a0812',WH=(d,sw=10)=>`<path d="${d}" fill="#fff" stroke="#fff" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"/>`;
 const COIN=(x,y,r,rot=0)=>`<g transform="translate(${x},${y}) rotate(${rot})"><ellipse cx="0" cy="${r*.22}" rx="${r}" ry="${r*.55}" fill="#b38f00" stroke="${K}" stroke-width="3.5"/><ellipse cx="0" cy="0" rx="${r}" ry="${r*.55}" fill="#ffc300" stroke="${K}" stroke-width="3.5"/><ellipse cx="${-r*.35}" cy="${-r*.15}" rx="${r*.28}" ry="${r*.12}" fill="#fff" opacity=".6"/></g>`;
 const STICKERS=[
@@ -707,12 +707,16 @@ function dealStickers(){const box=$('#goStk');if(!box)return;box.innerHTML='';co
   const keep=['#goSlit','#goLbl','#goLeft','#goArrow','#goTray','#goCount','#goHint b','#goEng','#goLip'].map(q=>go.querySelector(q)).filter(Boolean).map(e=>pad(rel(e.getBoundingClientRect()),8));
   go.querySelectorAll('#goStack .tok').forEach(t=>keep.push(pad(rel(t.getBoundingClientRect()),10)));
   go.classList.remove('measure');
-  const hit=(a,b)=>a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h,placed=[],n=3+Math.floor(Math.random()*3),bag=[...STICKERS].sort(()=>Math.random()-.5);
+  const hit=(a,b)=>a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h,placed=[],
+    // how many: scales with the cabinet's size (a phone gets ~6-10, a big desktop front up to 14); the pool runs twice so favourites can repeat
+    n=Math.min(14,Math.max(6,Math.round(g.width*g.height/15000)+Math.floor(Math.random()*3)-1)),bag=[...STICKERS].sort(()=>Math.random()-.5).concat([...STICKERS].sort(()=>Math.random()-.5)),
+    // stickers may overlap each other a little at the edges (a layered, stuck-on-over-time look); never the machine's important parts
+    core=r=>({x:r.x+r.w*.18,y:r.y+r.h*.18,w:r.w*.64,h:r.h*.64});
   for(const make of bag){if(placed.length>=n)break;let m=make();const e=document.createElement('div');e.className='stk';
     if(typeof m==='object'){e.classList.add(m.cls);m=m.html}e.innerHTML=m;e.style.visibility='hidden';box.appendChild(e);
     const w=e.offsetWidth,h=e.offsetHeight,rot=(Math.random()-.5)*28,bw=w*1.12+6,bh=h*1.12+6;let ok=false;
-    for(let k=0;k<40&&!ok;k++){const x=8+Math.random()*Math.max(1,g.width-bw-16),y=22+Math.random()*Math.max(1,g.height-bh-30),r={x,y,w:bw,h:bh};
-      if(keep.some(q=>hit(r,q))||placed.some(q=>hit(r,q)))continue;ok=true;placed.push(r);
+    for(let k=0;k<60&&!ok;k++){const x=8+Math.random()*Math.max(1,g.width-bw-16),y=22+Math.random()*Math.max(1,g.height-bh-30),r={x,y,w:bw,h:bh};
+      if(keep.some(q=>hit(r,q))||placed.some(q=>hit(core(r),core(q))))continue;ok=true;placed.push(r);
       Object.assign(e.style,{left:(x+(bw-w)/2)+'px',top:(y+(bh-h)/2)+'px',transform:`rotate(${rot.toFixed(1)}deg)`,visibility:''})}
     if(!ok)e.remove()}}
 // a token flying across the screen (as a fixed DOM element so it can cross the canvas and the box)
@@ -1869,7 +1873,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261128023900';let updShown=false,updDismissed='';
+const BUILD='20261128030632';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
