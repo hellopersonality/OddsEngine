@@ -643,26 +643,49 @@ let sw=null;
 function swipeStart(e){if(!canPress())return false;const top=topTok();if(!top||!J)return false;audio();
   const r=top.getBoundingClientRect(),f=document.createElement('span');f.className='tok tokFly '+tokCls(top);const tw=r.width;
   f.style.cssText=`--tw:${tw}px;left:${r.left}px;top:${r.top}px`;
-  const sp=slitPt();sw={id:e.pointerId,x0:e.clientX,y0:e.clientY,top,f,cx:r.left+r.width/2,cy:r.top+r.height/2,dx:0,dy:0,moved:false,pts:[{y:e.clientY,t:e.timeStamp}],dist:Math.max(40,r.top+r.height/2-sp.y),sx:sp.x,step:0,lt:0};return true}
+  const sp=slitPt();sw={id:e.pointerId,x0:e.clientX,y0:e.clientY,top,f,cx:r.left+r.width/2,cy:r.top+r.height/2,dx:0,dy:0,moved:false,pts:[{y:e.clientY,t:e.timeStamp}],dist:Math.max(40,r.top+r.height/2-sp.y),sx:sp.x,step:0,lt:0};return sw}
 const setSp=p=>{go.style.setProperty('--sp',p.toFixed(3));go.querySelectorAll('#goArrow i').forEach((c,i)=>c.classList.toggle('on',p>(i+1)/4))};
+// draw a lifted token at the drag offset (o.dx, o.dy): trail, glowing slot, lit chevrons, ratchet clicks, magnet pull near the top
+function liftDraw(o,now){const up=Math.min(0,o.dy),dn=Math.max(0,o.dy)*.25,p=Math.max(0,Math.min(1,-up/o.dist));
+  // near the slot the token is pulled in: it slides toward the slot's centre and turns edge-on
+  const m=Math.max(0,(p-.6)/.4),ex=o.dx*.6*(1-m)+(o.sx-o.cx)*m*.9;
+  o.f.style.transform=`translate(${ex}px,${up+dn}px) rotate(${o.dx*.15*(1-m)+m*55}deg) scale(${1+p*.3},${1+p*.3-m*.35})`;
+  if(J){setSp(p);if(now-o.lt>34&&p>.05){o.lt=now;const g=o.f.cloneNode();g.classList.add('tokGhost');g.style.transform=o.f.style.transform;document.body.appendChild(g);const an=g.animate([{opacity:.4},{opacity:0,transform:o.f.style.transform+' scale(.85)'}],{duration:240});an.onfinish=()=>g.remove()}}
+  // a ratchet: each step closer to the slot clicks, a little higher each time
+  const st=Math.floor(p*6);if(st>o.step){for(let k=o.step+1;k<=st;k++)tone(420+k*130,.03,'square',.03);buzz(4)}o.step=Math.max(o.step,st);return p}
+function liftOn(o){o.moved=true;inserting=true;o.top.classList.add('lift');document.body.appendChild(o.f)}
+// shoot it into the slot (v: upward speed, sets how hard it lands) or drop it back into the cup
+function liftLaunch(o,v){noteHint('swipe');const sp=slitPt(),tx=sp.x-o.cx,ty=sp.y-o.cy,dist=o.cy-sp.y,cur=o.f.style.transform,dur=Math.max(90,Math.min(220,(dist+o.dy)/Math.max(.6,v)));
+  const an=o.f.animate([{transform:cur},{transform:`translate(${tx}px,${ty}px) rotate(70deg) scale(.7)`}],{duration:dur,easing:'cubic-bezier(.2,.7,.4,1)',fill:'forwards'});
+  an.onfinish=()=>{o.f.remove();setSp(0);tokIn(1+Math.max(0,v-.45)*1.6)}}
+function liftDrop(o){const an=o.f.animate([{transform:o.f.style.transform},{transform:'translate(0,0)'}],{duration:260,easing:'cubic-bezier(.3,1.6,.5,1)',fill:'forwards'});
+  setSp(0);an.onfinish=()=>{o.f.remove();o.top.classList.remove('lift');inserting=false;tone(1100,.04,'triangle',.04);setTimeout(()=>tone(1500,.03,'triangle',.025),50)}}
 function swipeMove(e){if(!sw||e.pointerId!==sw.id)return;sw.dx=e.clientX-sw.x0;sw.dy=e.clientY-sw.y0;sw.pts.push({y:e.clientY,t:e.timeStamp});if(sw.pts.length>6)sw.pts.shift();
-  if(!sw.moved&&Math.hypot(sw.dx,sw.dy)>8){sw.moved=true;inserting=true;sw.top.classList.add('lift');document.body.appendChild(sw.f)}
-  if(sw.moved){const up=Math.min(0,sw.dy),dn=Math.max(0,sw.dy)*.25,p=Math.max(0,Math.min(1,-up/sw.dist));
-    // near the slot the token is pulled in: it slides toward the slot's centre and turns edge-on
-    const m=Math.max(0,(p-.6)/.4),ex=sw.dx*.6*(1-m)+(sw.sx-sw.cx)*m*.9;
-    sw.f.style.transform=`translate(${ex}px,${up+dn}px) rotate(${sw.dx*.15*(1-m)+m*55}deg) scale(${1+p*.3},${1+p*.3-m*.35})`;
-    if(J){setSp(p);const now=e.timeStamp;if(now-sw.lt>34&&p>.05){sw.lt=now;const g=sw.f.cloneNode();g.classList.add('tokGhost');g.style.transform=sw.f.style.transform;document.body.appendChild(g);const an=g.animate([{opacity:.4},{opacity:0,transform:sw.f.style.transform+' scale(.85)'}],{duration:240});an.onfinish=()=>g.remove()}}
-    // a ratchet: each step closer to the slot clicks, a little higher each time
-    const st=Math.floor(p*6);if(st>sw.step){for(let k=sw.step+1;k<=st;k++)tone(420+k*130,.03,'square',.03);buzz(4)}sw.step=Math.max(sw.step,st)}}
+  if(!sw.moved&&Math.hypot(sw.dx,sw.dy)>8)liftOn(sw);
+  if(sw.moved)liftDraw(sw,e.timeStamp)}
 function swipeEnd(e,cancel){if(!sw||e.pointerId!==sw.id)return;const s_=sw;sw=null;
   if(!s_.moved){if(!cancel)tryPlay();return}
-  const a=s_.pts[0],b=s_.pts[s_.pts.length-1],v=(a.y-b.y)/Math.max(1,b.t-a.t),sp=slitPt(),dist=s_.cy-sp.y,
-    cur=s_.f.style.transform,launch=!cancel&&(v>.45||-s_.dy>dist*.55);
-  if(launch){noteHint('swipe');const tx=sp.x-s_.cx,ty=sp.y-s_.cy,dur=Math.max(90,Math.min(220,(dist+s_.dy)/Math.max(.6,v)));
-    const an=s_.f.animate([{transform:cur},{transform:`translate(${tx}px,${ty}px) rotate(70deg) scale(.7)`}],{duration:dur,easing:'cubic-bezier(.2,.7,.4,1)',fill:'forwards'});
-    an.onfinish=()=>{s_.f.remove();setSp(0);tokIn(1+Math.max(0,v-.45)*1.6)}}
-  else{const an=s_.f.animate([{transform:cur},{transform:'translate(0,0)'}],{duration:260,easing:'cubic-bezier(.3,1.6,.5,1)',fill:'forwards'});
-    setSp(0);an.onfinish=()=>{s_.f.remove();s_.top.classList.remove('lift');inserting=false;tone(1100,.04,'triangle',.04);setTimeout(()=>tone(1500,.03,'triangle',.025),50)}}}
+  const a=s_.pts[0],b=s_.pts[s_.pts.length-1],v=(a.y-b.y)/Math.max(1,b.t-a.t);
+  if(!cancel&&(v>.45||-s_.dy>s_.dist*.55))liftLaunch(s_,v);else liftDrop(s_)}
+// desktop: a two-finger trackpad scroll (or the mouse wheel) lifts the token toward the slot like a swipe.
+// Either scroll direction counts, so natural and classic scrolling both work; scroll all the way (or flick and let go past halfway) and it goes in
+let wh=null;
+function wheelLift(e){if(sw||menuOpen)return;
+  if(!wh){if(!canPress())return;const top=topTok();if(!top)return;
+    if(!J){e.preventDefault();wh={acc:0,plain:true};}
+    else{const o=swipeStart({pointerId:-1,clientX:0,clientY:0,timeStamp:e.timeStamp});if(!o)return;wh=sw;sw=null;wh.acc=0;wh.t0=e.timeStamp;wh.last=[];liftOn(wh)}}
+  e.preventDefault();
+  const d=Math.abs(e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*400:e.deltaY)+Math.abs(e.deltaMode?0:e.deltaX)*.3;wh.acc+=d;
+  clearTimeout(wh.timer);
+  if(wh.plain){if(wh.acc>160){wh=null;tryPlay()}else wh.timer=setTimeout(()=>{wh=null},180);return}
+  wh.last.push({d,t:e.timeStamp});while(wh.last.length>1&&e.timeStamp-wh.last[0].t>120)wh.last.shift();
+  const need=Math.max(150,wh.dist*1.1);wh.dy=-Math.min(1,wh.acc/need)*wh.dist;wh.dx=0;
+  const p=liftDraw(wh,e.timeStamp),o=wh;
+  // speed of the last moments of scrolling, scaled to feel like a finger flick
+  const spd=()=>{const L=o.last,span=Math.max(16,L[L.length-1].t-L[0].t);return L.reduce((a,q)=>a+q.d,0)/span*.45};
+  if(p>=1){wh=null;liftLaunch(o,Math.max(.6,spd()));return}
+  wh.timer=setTimeout(()=>{if(wh!==o)return;wh=null;if(p>.55)liftLaunch(o,Math.max(.6,spd()));else liftDrop(o)},170)}
+addEventListener('wheel',wheelLift,{passive:false});
 // first-run callout on touch screens: shown until a few swipes (or taps) have happened, then never again
 const HINTK='oddsEngine.swipeHint',touchy=matchMedia('(pointer:coarse)').matches;
 let hintN=(()=>{try{return JSON.parse(localStorage.getItem(HINTK)||'{"s":0,"t":0}')}catch(e){return{s:0,t:0}}})();
@@ -1734,7 +1757,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261127185420';let updShown=false,updDismissed='';
+const BUILD='20261128013657';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
@@ -1758,7 +1781,7 @@ go.addEventListener('pointerdown',e=>{e.preventDefault();idleT=0;go.classList.re
 go.addEventListener('pointermove',swipeMove);
 go.addEventListener('pointerup',e=>swipeEnd(e,false));go.addEventListener('pointercancel',e=>swipeEnd(e,true));
 go.classList.toggle('hint',hintOn());
-$('#goHint b').textContent=touchy?'SWIPE OR TAP ↑':'CLICK OR DRAG ↑';
+$('#goHint b').textContent=touchy?'SWIPE OR TAP ↑':'SCROLL OR CLICK ↑';
 const release=()=>{go.classList.remove('down')};
 ['pointerup','pointerleave','pointercancel'].forEach(ev=>go.addEventListener(ev,release));
 addEventListener('keydown',e=>{
