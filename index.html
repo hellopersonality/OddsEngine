@@ -282,6 +282,8 @@ class Juicy{
   constructor(x,y,o={}){
     this.p={x:spring(x,x,o.k??500,o.z??.35),y:spring(y,y,o.k??500,o.z??.35)};
     this.s=spring(o.from??1,1,o.sk??420,o.sz??.3);this.r=spring(0,0,300,.3);
+    // squash & stretch: q>0 squashes (wide and flat), q<0 stretches (tall and thin); it springs back with a little jiggle
+    this.q=spring(0,0,o.qk??560,o.qz??.28);this.vs=o.vs??1;
     this.kick={x:spring(0,0,260,.4),y:spring(0,0,260,.4)};
     this.sh=[0,1,2].map(()=>({x:spring(x),y:spring(y),s:spring(o.from??1)}));
     this.ci=o.ci??0;this.highlight=0;
@@ -291,17 +293,24 @@ class Juicy{
   punch(v=10){if(cfg.punch)this.s.v+=v;return this}
   wobble(a=.35){if(cfg.punch)this.r.x=(Math.random()<.5?-1:1)*a;return this}
   shove(f=260){if(!cfg.punch)return this;const a=Math.random()*6.283;this.kick.x.v+=Math.cos(a)*f;this.kick.y.v+=Math.sin(a)*f;return this}
-  pop(){this.s.x=0;this.s.t=1;return this.punch(6).wobble()}
+  squash(a=.3){if(cfg.punch)this.q.x=Math.max(-.45,Math.min(.6,this.q.x+a));return this}
+  pop(){this.s.x=0;this.s.t=1;return this.punch(6).wobble().squash(-.28)}
   hide(){this.s.t=0;this.s.k=600;this.s.z=.9;return this}
   get motion(){const h=this.sh[0];return Math.min(1,(Math.abs(this.p.x.x-h.x.x)+Math.abs(this.p.y.x-h.y.x))/14+Math.abs(this.p.x.v)/900+Math.abs(this.p.y.v)/900)}
   update(dt){
-    for(const s of[this.p.x,this.p.y,this.s,this.r,this.kick.x,this.kick.y])stepSpring(s,dt);
+    for(const s of[this.p.x,this.p.y,this.s,this.r,this.q,this.kick.x,this.kick.y])stepSpring(s,dt);
     this.sh.forEach((h,j)=>{const k=lagK()*Math.pow(.6,j);h.x.k=h.y.k=h.s.k=k;h.x.z=h.y.z=h.s.z=.55;
       h.x.t=this.p.x.x;h.y.t=this.p.y.x;h.s.t=this.s.x;stepSpring(h.x,dt);stepSpring(h.y,dt);stepSpring(h.s,dt)});
   }
   shadowXf(j,base=cfg.offset){const h=this.sh[j],o=base*(j+1);
-    return{x:h.x.x+o+this.kick.x.x*(j+1)*.06,y:h.y.x+o+this.kick.y.x*(j+1)*.06,s:Math.max(0,h.s.x),r:this.r.x*.7}}
-  xf(){return{x:this.p.x.x,y:this.p.y.x,s:Math.max(0,this.s.x),r:this.r.x}}
+    const d=this.deform();return{x:h.x.x+o+this.kick.x.x*(j+1)*.06,y:h.y.x+o+this.kick.y.x*(j+1)*.06,s:Math.max(0,h.s.x),r:this.r.x*.7,sx:d.sx,sy:d.sy}}
+  // per-axis scale from squash plus a stretch along the direction of travel (volume roughly kept: one axis grows, the other shrinks)
+  deform(){let sx=1,sy=1;if(!cfg.punch)return{sx,sy};
+    const q=Math.max(-.45,Math.min(.6,this.q.x));sx*=1+q;sy/=1+q;
+    if(this.vs){const vx=Math.abs(this.p.x.v),vy=Math.abs(this.p.y.v),k=Math.min(.12,Math.max(vx,vy)/6000)*this.vs;
+      if(vy>=vx){sy*=1+k;sx/=1+k}else{sx*=1+k;sy/=1+k}}
+    return{sx,sy}}
+  xf(){const d=this.deform();return{x:this.p.x.x,y:this.p.y.x,s:Math.max(0,this.s.x),r:this.r.x,sx:d.sx,sy:d.sy}}
 }
 // neo-brutalist sticker: colour fill + thick black outline; lagging shadow copies in palette colours, also outlined
 // live: 1 = colour-cycling (scoring), 0 = the calm UI colours; in between they cross-fade
@@ -310,9 +319,9 @@ function drawSticker(ctx,j,text,size,font='"Archivo Black", Impact, sans-serif',
   const step=cycleIndex()+j.ci,fill=(c,calm)=>{if(live<1){ctx.fillStyle=calm;ctx.fillText(text,0,0)}if(live>0){const a=ctx.globalAlpha;ctx.globalAlpha=a*live;ctx.fillStyle=c;ctx.fillText(text,0,0);ctx.globalAlpha=a}};
   ctx.font=`${size}px ${font}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
   if(cfg.shadow&&shadows)for(let L=Math.min(cfg.layers,3)-1;L>=0;L--){const t=j.shadowXf(L,cfg.offset*size/44);
-    ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);ctx.lineWidth=size*.24;ctx.strokeStyle='#0d0a18';ctx.strokeText(text,0,0);fill(pal(step+5+L*2),th.rim);ctx.restore()}
-  const t=j.xf();ctx.save();ctx.translate(t.x,t.y+size*.1);ctx.rotate(t.r);ctx.scale(t.s,t.s);ctx.lineWidth=size*.28;ctx.strokeStyle='#0d0a18';ctx.strokeText(text,0,0);ctx.fillStyle='#0d0a18';ctx.fillText(text,0,0);ctx.restore();
-  ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);
+    ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s*(t.sx??1),t.s*(t.sy??1));ctx.lineWidth=size*.24;ctx.strokeStyle='#0d0a18';ctx.strokeText(text,0,0);fill(pal(step+5+L*2),th.rim);ctx.restore()}
+  const t=j.xf();ctx.save();ctx.translate(t.x,t.y+size*.1);ctx.rotate(t.r);ctx.scale(t.s*(t.sx??1),t.s*(t.sy??1));ctx.lineWidth=size*.28;ctx.strokeStyle='#0d0a18';ctx.strokeText(text,0,0);ctx.fillStyle='#0d0a18';ctx.fillText(text,0,0);ctx.restore();
+  ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s*(t.sx??1),t.s*(t.sy??1));
   ctx.lineWidth=size*.28;ctx.strokeStyle='#0d0a18';ctx.strokeText(text,0,0);fill(pal(step+2),th.bezel);ctx.restore();
 }
 class JuiceWorld{
@@ -532,7 +541,7 @@ S.sides=S.sides.slice(0,S.dice);while(S.sides.length<S.dice)S.sides.push(6);
 S.dp=S.dp.slice(0,S.dice);while(S.dp.length<S.dice)S.dp.push(newPerks());
 S.fx=S.fx.slice(0,S.dice);while(S.fx.length<S.dice)S.fx.push('');S.fx=S.fx.map((x,i)=>x&&FXD[x].sides===S.sides[i]?x:'');
 function save(){try{localStorage.setItem(KEY,JSON.stringify({...S,score:score.value}))}catch(e){}}
-const ROLL=.8,LAND_GAP=.2,FLIP=.42;
+const ROLL=.8,LAND_GAP=.2,FLIP=.42,WINDUP=.08;
 const headsP=()=>.55+.05*S.luck;
 const resFor=t=>t==='gold'||t==='wild'?'h':Math.random()<(t==='lead'?.75:headsP())?'h':'t';
 const need=()=>Math.round(2*Math.pow(1.6,S.lv-1));
@@ -876,7 +885,9 @@ function press(){
     const spill=Math.max(.012,Math.min(.04,.5/Math.max(1,n))),land=dice.map((d,i)=>ROLL+i*LAND_GAP+(seqs[i].length-1)*BOOM);
     dice.forEach((d,i)=>{
       d.rolling=true;d.t0=T;d.lt=ROLL+i*LAND_GAP;d.ft=0;
-      if(cfg.punch){d.j.p.y.v-=900+Math.random()*250;d.j.p.x.v+=(Math.random()*2-1)*260;d.j.punch(10)}
+      // anticipation: each die crouches (squashes down and dips) for a beat before it's thrown; the tumble starts on the throw
+      if(cfg.punch){const w=WINDUP+i*.02;d.windup=T+w;d.j.squash(.32);d.j.p.y.v+=d.size*5;
+        at(T+w,()=>{d.windup=0;d.j.p.y.v-=900+Math.random()*250;d.j.p.x.v+=(Math.random()*2-1)*260;d.j.punch(10).squash(-.18)})}
       seqs[i].slice(0,-1).forEach((v,k)=>at(d.lt+k*BOOM,()=>explodeDie(d,v,k+1)));
       at(land[i],()=>landDie(d,rolls[i],per[i],spill,seqs[i]));
     });
@@ -911,7 +922,7 @@ function explodeDie(d,v,k){
 }
 function landDie(d,v,mine,spill,seq=[v]){
   const maxed=seq.includes(d.sides),tot=seq.reduce((a,b)=>a+b,0);
-  d.rolling=false;d.face=v;d.landed=true;d.hl=1;d.j.p.x.t=d.hx;d.j.punch(16).shove(300);if(cfg.punch)d.j.r.x=(Math.random()<.5?-1:1)*.35;
+  d.rolling=false;d.face=v;d.landed=true;d.hl=1;d.j.p.x.t=d.hx;d.j.punch(16).shove(300).squash(.42);if(cfg.punch)d.j.r.x=(Math.random()<.5?-1:1)*.35;
   at(T+.12,()=>rollTrigger(d,v));
   sfx.land(v===d.sides);world.shake(v===d.sides?.22:.13);
   if(fxFace(d)){const q=FXD[d.fx];d.armed=true;bpulse(d,'fx');sfx.ping();
@@ -962,7 +973,7 @@ function payLine(l){
   if(hasPart('echo')&&!ph.echoed&&bonus>0){ph.echoed=true;bonus*=2;at(T+.2,()=>partHit('echo','ECHO ×2'))}
   const a=l.cs[0],b=l.cs[l.cs.length-1],mx=(a.tx+b.tx)/2,my=(a.ty+b.ty)/2;
   ph.tot+=bonus;payout(mx,my,bonus,Math.min(10,Math.max(3,bonus)));sfx.line(ph.paid.length);
-  l.cs.forEach(o=>{o.hl=1;o.j.punch(9)});hudJ.punch(10);if(S.lineMult>3)statHit('lines');
+  l.cs.forEach(o=>{o.hl=1;o.j.punch(9).squash(.2)});hudJ.punch(10);if(S.lineMult>3)statHit('lines');
   if(J){world.popText('LINE ×'+S.lineMult,mx,my,{size:Math.min(52,W/8),layers:2,kick:8,life:1.2,ci:ph.paid.length*3});world.shake(.3)}
   // cascade: queued, not run now. Anything that changes the board waits until every coin on screen has resolved (see endPress)
   const fresh=l.cs.filter(o=>!o.pc);
@@ -976,7 +987,7 @@ function cascadeLine(fresh){
 }
 function resolveCoin(c){
   const wasTease=c.tease;if(c.tease){c.tease=false;c.j.s.t=1;c.j.moveTo(c.tx,c.ty);tease=null}
-  c.flipping=false;c.face=c.res;c.pc=false;c.j.punch(10).wobble(.25);
+  c.flipping=false;c.face=c.res;c.pc=false;c.j.punch(10).wobble(.25).squash(.3);
   const k=ph.n>24?1:ph.n>8?2:3;
   if(c.res==='h'){
     const gold=c.type==='gold';let v=c.copyVal!=null?c.copyVal:c.type==='lead'?1:c.type==='wild'?0:(S.val+S.chain*ph.streak)*(gold?5:1);ph.streak++;if(S.chain&&ph.streak>1)statHit('chain');c.val=v;c.final=true;
@@ -1454,9 +1465,9 @@ function polyPath(g,sides,R){ptsPath(g,diePts(sides,R))}
 const DIECOL={4:'#ffffff',6:'#ffffff',8:'#9ae7ff',10:'#b5ffa2',12:'#ffb8dd',20:'#ffe884'};
 function drawDie(d){
   const j=d.j,t=j.xf(),s=d.size,R=s*.58;if(t.s<.02)return;const step=cycleIndex(),a=J?Math.max(j.motion,d.hl,d.rolling?1:0):0,lw=Math.max(2,s*.06);
-  if(cfg.shadow&&a>.02)for(let L=cfg.layers-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*s/40);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y);ctx.rotate(q.r+(d.rolling?d.spin*.8:0));ctx.scale(q.s,q.s);polyPath(ctx,d.sides,R);ctx.fillStyle=pal(step+j.ci+L*2);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
+  if(cfg.shadow&&a>.02)for(let L=cfg.layers-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*s/40);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y);ctx.rotate(q.r+(d.rolling?d.spin*.8:0));ctx.scale(q.s*(q.sx??1),q.s*(q.sy??1));polyPath(ctx,d.sides,R);ctx.fillStyle=pal(step+j.ci+L*2);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
   const ang=t.r+(d.rolling?d.spin:0),dep=Math.max(4,s*.16),col=d.fx?FXD[d.fx].col:DIECOL[d.sides],ef=fxFace(d),acc=d.fx?FXD[d.fx].acc:'#0d0a18',P=rotPts(diePts(d.sides,R),ang),clw=Math.max(3,s*.085);
-  ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);
+  ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s*(t.sx??1),t.s*(t.sy??1));
   if(d.armed){const k=1+Math.sin(tA*9)*.06;ctx.save();ctx.globalAlpha=.85;ctx.lineWidth=Math.max(3,s*.09);ctx.strokeStyle=acc;ctx.setLineDash([s*.16,s*.1]);ctx.lineDashOffset=-tA*40;ctx.beginPath();ctx.arc(0,dep*.4,s*.88*k,0,7);ctx.stroke();ctx.restore()}
   chunkBase(ctx,P,dep,col,clw);ptsPath(ctx,P);ctx.fillStyle=col;ctx.fill();ctx.lineWidth=clw;ctx.strokeStyle=th.line;ctx.stroke();
   ctx.rotate(ang);
@@ -1488,8 +1499,8 @@ function drawCoin(c){
   const j=c.j,t=j.xf();if(t.s<.02)return;const r=c.r;let w=1,face=c.face||'h';
   if(c.flipping){const p0=Math.min(1,(T-c.t0)/c.dur),p=c.tease?1-Math.pow(1-p0,3):p0,ang=p*(c.spins||(c.res==='h'?6:7))*Math.PI,cs=Math.cos(ang);w=Math.abs(cs);face=cs>=0?'h':'t'}
   const typ=c.look||c.type||'plain',spec=typ!=='plain',gold=typ==='gold',ew=r*Math.max(.1,w),step=cycleIndex(),a=J?Math.max(j.motion,c.hl,c.flipping?.8:0,gold?.6:0):0,Hd=face==='h',lw=Math.max(2,r*.08);
-  if(cfg.shadow&&a>.02&&!(c.ra<1))for(let L=(gold?2:cfg.layers)-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*r/30);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y);ctx.rotate(q.r);ctx.scale(q.s,q.s);ctx.fillStyle=pal(step+j.ci+L*2);ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
-  ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s,t.s);if(tease&&c!==tease.c&&!tease.line.cs.includes(c))ctx.globalAlpha=.28;if(c.ra<1)ctx.globalAlpha*=Math.max(0,c.ra);
+  if(cfg.shadow&&a>.02&&!(c.ra<1))for(let L=(gold?2:cfg.layers)-1;L>=0;L--){const q=j.shadowXf(L,cfg.offset*r/30);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(q.x,q.y);ctx.rotate(q.r);ctx.scale(q.s*(q.sx??1),q.s*(q.sy??1));ctx.fillStyle=pal(step+j.ci+L*2);ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=lw;ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
+  ctx.save();ctx.translate(t.x,t.y);ctx.scale(t.s*(t.sx??1),t.s*(t.sy??1));if(tease&&c!==tease.c&&!tease.line.cs.includes(c))ctx.globalAlpha=.28;if(c.ra<1)ctx.globalAlpha*=Math.max(0,c.ra);
   const dim=c.dim&&!c.flipping,blank=!c.face&&!c.flipping,fill=blank?th.blank:Hd?COINS[typ].col:dim?th.tails:th.mid,clw=Math.max(3,r*.11);
   chunkBase(ctx,rotPts(ellPts(ew,r),t.r),Math.max(3,r*.2),fill,clw);ctx.rotate(t.r);
   ctx.fillStyle=fill;ctx.beginPath();ctx.ellipse(0,0,ew,r,0,0,7);ctx.fill();ctx.lineWidth=clw;ctx.strokeStyle=th.line;ctx.stroke();
@@ -1536,8 +1547,8 @@ function drawCharm(c){const j=c.j,t=j.xf(),s=c.size;if(t.s<.02)return;const q=CH
   const L=dieLeftOf(line.indexOf(c));
   if(c.spark>.02&&L&&J){const n=7,x0=L.j.p.x.x,y0=L.j.p.y.x,x1=t.x,y1=t.y,P=[];for(let k=0;k<=n;k++){const u=k/n;P.push([x0+(x1-x0)*u,y0+(y1-y0)*u+(k%n?(k%2?-1:1)*s*.18:0)])}
     ctx.save();ctx.globalAlpha=Math.min(1,c.spark*1.4);ctx.lineJoin='round';ctx.beginPath();P.forEach(([x,y],k)=>k?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.lineWidth=s*.16;ctx.strokeStyle=th.line;ctx.stroke();ctx.lineWidth=s*.08;ctx.strokeStyle=pal(step+1);ctx.stroke();ctx.restore()}
-  if(cfg.shadow&&a>.02)for(let k=cfg.layers-1;k>=0;k--){const z=j.shadowXf(k,cfg.offset*s/40);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(z.x,z.y);ctx.rotate(z.r);ctx.scale(z.s,z.s);ptsPath(ctx,tagPts(s*.96,s*1.12,s*.2));ctx.fillStyle=pal(step+j.ci+k*2);ctx.fill();ctx.lineWidth=Math.max(2,s*.06);ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
-  ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);charmFace(ctx,c.id,s,c);ctx.restore();
+  if(cfg.shadow&&a>.02)for(let k=cfg.layers-1;k>=0;k--){const z=j.shadowXf(k,cfg.offset*s/40);ctx.save();ctx.globalAlpha=Math.min(1,a);ctx.translate(z.x,z.y);ctx.rotate(z.r);ctx.scale(z.s*(z.sx??1),z.s*(z.sy??1));ptsPath(ctx,tagPts(s*.96,s*1.12,s*.2));ctx.fillStyle=pal(step+j.ci+k*2);ctx.fill();ctx.lineWidth=Math.max(2,s*.06);ctx.strokeStyle=th.line;ctx.stroke();ctx.restore()}
+  ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s*(t.sx??1),t.s*(t.sy??1));charmFace(ctx,c.id,s,c);ctx.restore();
   if(q.cond&&!c.dragging){const lit=charmLit(c),f=Math.max(10,s*.24),y=t.y+s*.78;ctx.save();ctx.font=`${Math.round(f)}px "Archivo Black", sans-serif`;
     const w=Math.max(f*1.6,ctx.measureText(q.cond).width+f*.9),h=f*1.45,k=t.s*(1+.4*c.spark);ctx.translate(t.x,y);ctx.scale(k,k);
     rr(ctx,-w/2,-h/2,w,h,h/2);ctx.fillStyle=lit?q.col:th.off||'#2a2541';ctx.fill();ctx.lineWidth=Math.max(2,f*.2);ctx.strokeStyle=th.line;ctx.stroke();
@@ -1647,7 +1658,7 @@ function drawBgFx(k){
 }
 function drawBar(){
   const k=UI.k,g=need(),t=barJ.xf(),chip=Math.round(58*k),bw=Math.min(300*k,W-110),bh=Math.max(26,Math.round(32*k)),x0=-bw/2+chip/2+4,p=Math.min(1,score.shown/g),step=cycleIndex(),full=score.value>=g;
-  ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s,t.s);
+  ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.r);ctx.scale(t.s*(t.sx??1),t.s*(t.sy??1));
   const bx=-bw/2+chip+10,bW=bw-chip-10,dep=Math.round(6*k);
   chunkBox(ctx,-bw/2,-bh/2,chip,bh,10,dep,J?pal(step+4):'#00dc7d',4);
   ctx.fillStyle='#0d0a18';ctx.font=`${Math.max(12,Math.round(14*k))}px "Archivo Black", sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('LV '+S.lv,-bw/2+chip/2,1);
@@ -1737,7 +1748,7 @@ function frame(now){
   const P=isPaused(),raw=P?0:Math.min(.05,(now-last)/1000);last=now;const dt=raw*cfg.timeScale;T+=dt;
   for(let guard=0;guard<8;guard++){const due=events.filter(e=>e.t<=T);if(!due.length)break;events=events.filter(e=>e.t>T);due.sort((a,b)=>a.t-b.t).forEach(e=>e.fn())}
   charms.forEach(c=>{c.hl=Math.max(0,c.hl-dt*1.8);c.spark=Math.max(0,c.spark-dt*1.6)});
-  dice.forEach(d=>{if(d.rolling){const p=Math.min(1,(T-d.t0)/d.lt);d.spin=(d.spin||0)+dt*(1-p)*22;d.ft-=dt;if(d.ft<=0){d.ft=.04+p*p*.16;d.face=anyFace(d);sfx.tumble(p)}}else d.spin=0;d.hl=Math.max(0,d.hl-dt*1.8);if(d.bp)for(const k in d.bp)d.bp[k]=Math.max(0,d.bp[k]-dt*2.2)});
+  dice.forEach(d=>{if(d.rolling&&d.windup&&T<d.windup)d.spin=0;else if(d.rolling){const p=Math.min(1,(T-d.t0)/d.lt);d.spin=(d.spin||0)+dt*(1-p)*22;d.ft-=dt;if(d.ft<=0){d.ft=.04+p*p*.16;d.face=anyFace(d);sfx.tumble(p)}}else d.spin=0;d.hl=Math.max(0,d.hl-dt*1.8);if(d.bp)for(const k in d.bp)d.bp[k]=Math.max(0,d.bp[k]-dt*2.2)});
   coins.forEach(c=>c.hl=Math.max(0,c.hl-dt*1.4));stepReels();
   tA+=raw;
   if(amb()){
@@ -1885,7 +1896,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261128161423';let updShown=false,updDismissed='';
+const BUILD='20261128164417';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
