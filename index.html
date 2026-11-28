@@ -356,16 +356,24 @@ function applyVol(){if(!ac)return;const t=ac.currentTime;masterBus.gain.setTarge
 function saveVol(){try{localStorage.setItem(VOLK,JSON.stringify(vol))}catch(e){}}
 function audio(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)();masterBus=ac.createGain();sfxBus=ac.createGain();musicBus=ac.createGain();sfxBus.connect(masterBus);musicBus.connect(masterBus);masterBus.connect(ac.destination);applyVol();startMusic()}catch(e){ac=null}}if(ac&&ac.state==='suspended'&&!document.hidden)ac.resume().catch(()=>{})}
 // background music: one seamless loop, decoded once and looped sample-accurately by Web Audio
-const MUSIC_FRAMES=1087010,MUSIC_RATE=48000;let musicSrc=null,musicLoading=false;
+const MUSIC_FRAMES=1087010,MUSIC_RATE=48000;let musicSrc=null,musicLP=null,musicLoading=false;
 function startMusic(){if(!ac||musicSrc||musicLoading)return;musicLoading=true;
   fetch('music.mp3').then(r=>r.arrayBuffer()).then(b=>new Promise((ok,no)=>ac.decodeAudioData(b,ok,no))).then(buf=>{
     const len=MUSIC_FRAMES/MUSIC_RATE,src=ac.createBufferSource();src.buffer=buf;src.loop=true;
     // decoders that don't trim the MP3's encoder delay leave ~1105 samples of silence at the start: skip them
     const lead=buf.duration-len>.015?1105/MUSIC_RATE:0;src.loopStart=lead;src.loopEnd=Math.min(buf.duration,lead+len);
-    src.connect(musicBus);src.start(0,lead);musicSrc=src;
+    // a low-pass filter in the music's path: wide open while playing, swept down while the upgrade cards are up
+    musicLP=ac.createBiquadFilter();musicLP.type='lowpass';musicLP.frequency.value=20000;musicLP.Q.value=.9;
+    src.connect(musicLP);musicLP.connect(musicBus);src.start(0,lead);musicSrc=src;mt.r=1;mt.lp=20000;
     // fade in rather than snap on
     const t=ac.currentTime;musicBus.gain.cancelScheduledValues(t);musicBus.gain.setValueAtTime(0,t);musicBus.gain.linearRampToValueAtTime(curve(vol.music)*.7,t+1.5)
   }).catch(()=>{}).finally(()=>{musicLoading=false})}
+// the music follows the game: when a run is lost it winds down like a tape slowing (pitch drops with it) and spins back up on a new run;
+// while the level-up cards are open it's muffled by a low-pass sweep, and opens back up when you pick
+const mt={r:1,lp:20000};
+function musicTick(){if(!musicSrc||!ac)return;const t=ac.currentTime,r=(over||overDelay>=0)?.58:1,lp=lvlOpen?620:20000;
+  if(r!==mt.r){mt.r=r;const pr=musicSrc.playbackRate;pr.cancelScheduledValues(t);pr.setValueAtTime(pr.value,t);pr.setTargetAtTime(r,t,r<1?.5:.16)}
+  if(lp!==mt.lp){mt.lp=lp;const f=musicLP.frequency;f.cancelScheduledValues(t);f.setValueAtTime(f.value,t);f.setTargetAtTime(lp,t,lp<20000?.12:.18)}}
 // the music (and everything else) pauses while the game is in the background
 document.addEventListener('visibilitychange',()=>{if(!ac)return;if(document.hidden)ac.suspend().catch(()=>{});else ac.resume().catch(()=>{})});
 function tone(f,d,type='square',v=.06,f2){if(!ac||!sound)return;const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(sfxBus);o.start(t);o.stop(t+d+.02)}
@@ -1668,6 +1676,7 @@ function frame(now){
   if(lvDelay>=0){lvDelay-=raw;if(lvDelay<0)openLevel()}
   if(goHold>0)goHold-=raw;
   refreshGo();
+  musicTick();
   if(!goHidden&&!inserting&&!sw&&!isPaused()){idleT+=raw;if(idleT>IDLE_HINT&&!go.classList.contains('idle'))go.classList.add('idle')}else{idleT=0;go.classList.remove('idle')}
   draw();
   const ci=cycleIndex(),pk=J?ci:-1;if(pk!==lastPal){lastPal=pk;const rs=document.documentElement.style;rs.setProperty('--pal',J?pal(ci):'#ffd400');rs.setProperty('--pal2',J?pal(ci+3):'#00b7f0')}
@@ -1790,7 +1799,7 @@ $('#tMenu').addEventListener('click',()=>{$('#panel').classList.remove('open');$
 openMenu();
 // The live site carries version.json next to index.html. When it no longer matches the BUILD baked into this page,
 // offer a reload (never mid-press). Polls every 2 minutes and whenever the tab comes back to the foreground.
-const BUILD='20261128020308';let updShown=false,updDismissed='';
+const BUILD='20261128020704';let updShown=false,updDismissed='';
 async function checkUpdate(){
   if(location.protocol==='file:')return;
   try{const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
